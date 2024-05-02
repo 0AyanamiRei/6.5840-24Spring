@@ -11,7 +11,7 @@
 我们来具体看看代码,主要是想了解下不同文件之间传递了哪些数据结构.
 
 ```go
-// worker.go
+// worker.go中
 type KeyValue struct {
 	Key   string
 	Value string
@@ -32,6 +32,8 @@ func Map(filename string, contents string) []mr.KeyValue {
 	return kva
 }
 ```
+
+`mr.KeyValue`就是上面在文件`worker.go`中定义的结构体.
 
 
 ## mrsequential.go

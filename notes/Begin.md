@@ -193,8 +193,13 @@ $
 2019/12/16 13:27:09 rpc.Register: method "Done" has 1 input parameters; needs exactly three
 ```
 
+### rules
 
-### 环境配置
-
-暂时按照这个流程走:[go环境配置](https://zhuanlan.zhihu.com/p/625866338)
+- map阶段将中间keys分成多个buckets, 变量`nReduce`是reduce tasks的数量, 也就是`main/mrcoordinator.go`传给`MakeCoordinator()`的参数, 每个mapper应该创建nReduce个中间文件以供reduce tasks使用
+- worker应该将第X个reduce tasks的输出记录在`mr-out-X`中
+- `mr-out-X`文件的格式每一行是一个Reduce function的输出, 使用`Go "%v %v"`格式化产生, 查看`main/mrsequential.go`中注释`this is the correct format`给出的正确格式.
+- 你可以修改 `mr/worker.go`,`mr/coordinator.go`, `mr/rpc.go`, 也可以临时修改其他文件进行测试,但请确保您的代码能在原始版本下运行,我们将使用原始版本进行测试
+- worker应该将map的中间输出放到当前的目录文件中, 以便worker在reduce tasks中读取它们
+- `main/mrcoordinator.go`希望`mr/coordinator.go`实现一个`Done()`方法:当 MapReduce完全完成时返回true, 此时,`mrcoordinator.go`将退出;
+- 任务完成后, worker进程应该退出, 实现这个逻辑的一个简单方法是使用`call()`的返回值
 

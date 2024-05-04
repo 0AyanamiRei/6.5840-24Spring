@@ -51,6 +51,8 @@ func main() {
 		}
 		file.Close()
 		kva := mapf(filename, string(content))
+		// "kva..."是切片展开操作, 将kva的内容追加
+		// 而不是kva作为一个元素追加
 		intermediate = append(intermediate, kva...)
 	}
 

@@ -18,13 +18,15 @@ import (
 
 type ExampleArgs struct {
 	// worker->master
-	Task tasksMetadata
+	Task          tasksMetadata
+	Intermediates []int
 }
 
 type ExampleReply struct {
 	// master->worker
-	Task    tasksMetadata
-	JobDone int
+	Task     tasksMetadata
+	JobState int
+	NReduce  int
 }
 
 // Add your RPC definitions here.

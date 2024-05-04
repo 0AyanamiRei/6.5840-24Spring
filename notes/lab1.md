@@ -89,7 +89,7 @@ type ExampleArgs struct {
 type ExampleReply struct {
 	// master->worker
 	Task    tasksMetadata // 追踪任务信息
-	JobDone int           // 0:Job未做完 333:Map&Reduce任务完成
+	JobDone int           // JOBDONE:Job完成, JOBDOING:Job正在进行
 }
 ```
 
@@ -191,11 +191,9 @@ func (c *Coordinator) CommitOK(args *ExampleArgs, reply *ExampleReply) error {
 
 我们的worker是处在一个循环中的, 不停的向主机请求任务, 我们设置当NReduce的值减少至0的时候(默认Map阶段完成, 因为只有Map完成才会开始Reduce)表示整个Job完成
 
-我们添加一对Rpc: `AskDone`和`Done`, worker向主机查询是否JOB完成, 从而来退出循环关闭程序.
+我们添加一个Rpc: `Done`, mrcoordinator程序不断向主机查询是否JOB完成, 从而来退出循环关闭程序.
 
 ```go
-
-
 func (c *Coordinator) Done() bool {
 	if c.NMapped != c.Nfile || c.NReduce != 0 {
 		return false
@@ -212,4 +210,59 @@ func (c *Coordinator) Done() bool {
 	}
 	return true
 }
+```
+
+这里我们暂时保守地对MapTasks和ReduceTasks记录的数据都检查了一遍, 其实只需要检查`NMapped==Nfile`和`NReduce==0`即可的. 添加一些输出语句, 来检查一下:(修改nReduce=2, 且只传入一个文件)
+
+```sh
+go build -buildmode=plugin ../mrapps/wc.go
+
+go run mrcoordinator.go pg-grimm.txt pg-being_ernest.txt
+
+go run mrworker.go wc.so
+```
+
+我们需要在`coordinator.go`中分配任务函数`Task`里处理`task == nil`的情况, 分析了一下原因, 我们主机进程每次调用`Done()`查询后就会休眠1秒, 这期间已经足够worker进程发出很多次询问了, 所以我们可以拦截`task == nil`返回一些信息给worker告诉worker进程Job已经完成了.
+
+在`reply`里附加一个信息: `JobState` : RPCERROR = 2,JOBDONE = 1, JOBDOING = 0
+
+现在再执行上面的语句后的结果:
+
+```sh
+(Rpc数据): 第0号MAP任务,任务状态:1,对象文件名:pg-grimm.txt
+do....
+over!
+(Rpc数据): 第0号REDUCE任务,任务状态:1,对象文件名:CC
+do....
+over!
+(Rpc数据): 第1号REDUCE任务,任务状态:1,对象文件名:CC
+do....
+over!
+Worker关闭, JOB完成!
+```
+
+那么我觉得现在整体的框架就搭好了, 至少对目前简单版本的MapReduce
+
+### Map()
+
+先罗列一下Hints中对简单版本MapReduce完成task有帮助的:
+
+1. 在实验的环境下, 我们允许利用workers共享同一个文件系统这一条件.
+2. Map产生的临时文件一种易读的命令方式是`mr-X-Y`, 表示第X个Map任务, 第Y个Reduce任务.
+3. 提示给出了一个临时文件中的建议: 使用go的包`encoding/json package`
+4. 对于一个给定的key, 你可以使用`ihash(key)`来找到对应的reduce task编号
+5. 你可以从`mrsequential.go`借鉴一些代码, 用于读取文件, 对中间键值对排序, 以及将Reduce的输出存储在文件
+
+思考了一下, 现在可以理解为什么论文中说master要做O(MxR)次调度决定以及保存O(MxR)	个状态了, 同时我们要在master中管理map任务产生的中间文件, 我们在woker对master的RPC函数参数中附带这些信息: 产生的`mr-X-Y`文件中的'Y', 作为一个数组返回.
+
+我们在RPC:CommitTask 中附加上述的信息给主机, 然后在CommitOK中处理它, 当RPC消息来源是执行map任务的worker的时候, 我们需要根据其生成的中间文件修改reduce metadata中的`Filename`(现在我们需要把这一个数据修改为`[]string`)
+
+测试
+```sh
+go build -buildmode=plugin ../mrapps/wc.go
+
+go run mrcoordinator.go test1.txt test2.txt
+
+go run mrworker.go wc.so
+```
 ```

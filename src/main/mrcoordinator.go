@@ -23,7 +23,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	m := mr.MakeCoordinator(os.Args[1:], 4)
+	m := mr.MakeCoordinator(os.Args[1:], 1)
 	for m.Done() == false {
 		time.Sleep(time.Second)
 	}

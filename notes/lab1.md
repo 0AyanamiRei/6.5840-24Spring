@@ -59,7 +59,6 @@ mapf, reducef := loadPlugin(os.Args[1])
 go run mrsequential.go wc.so pg*.txt
 ```
 
-<<<<<<< HEAD
 其中`pg-*.txt`是一个shell通配符, 匹配当前目录下所有以`pg-`开头的文件.
 
 ## 开始实验
@@ -273,8 +272,7 @@ go run mrcoordinator.go test1.txt test2.txt
 
 go run mrworker.go wc.so
 ```
-```
-=======
+
 其中`pg-*.txt`是一个shell通配符, 匹配当前目录下所有以`pg-`开头的文件, `wc.so`则是一个**plugin**: 定义了**MapReduce**中`map()`和`reduce()`函数的具体内容, 在这里被`loadPlugin(os.Args[1])`从中加载具体的Map和Reduce函数, 返回`mapf`和`reducef`, 也就是这两个函数.
 
 ```go
@@ -357,4 +355,59 @@ values = [
 将reduce后的结果按照正确的格式写入到文件句柄`ofile`管理的文件中.
 
 至此, 我们了解了一个简单的**MapReduce**的程序是如何运行的, 可以看到它仅仅是一个进程, 没有并行以及分布式的运算, 我们的任务就是改进它!
->>>>>>> 4281666d7c582b8d27497ed15ad6fd45575a9477
+
+### 多个workers
+
+折腾了一天, 就加了把大锁以及在`task==nil`的时候让得到`RPCERROR`的worker进入睡眠:
+
+```
+因为我发现如果要使用sync.cond的话需要使用rpc通信传递条件变量和锁但是这一点貌似是不被允许的, 所以老老实实的让得到RPCERROR消息的进程睡眠1s
+```
+
+**追加:** 我们可以让RPC处理程序阻塞, 这样就相当于worker等待调度
+
+跟细致的锁等通过测试再优化, 现在还待完善的部分是hints中提到的一些:
+
+- 需要一个机制来让主机区分崩溃的worker和因故停滞的worker, 并且把崩溃的worker执行的任务分配给其他worker.
+
+- 如果你想要实现论文中提到的`Backup`也需要识别崩溃和停滞的worker
+
+- 你可以使用`mrapps/crash.go`应用程序插件来测试崩溃恢复,它会在Map和Reduce中随机地退出
+
+- 论文中提到了使用临时文件并在文件完全写入后再原子重命名的技巧,来避免在机器崩溃的时候观察到部分写入的文件, 在`go 1.17`或更高版本中, 使用`os.CreateTemp`创建临时文件, 使用`os.Rename`原子重命名文件.
+
+先把简单的做了吧, 第一件事是先把数据写到临时文件:
+
+```go
+// 只需要按照如下的模式进行即可
+// 创建临时文件"tempfile"
+file, err := os.CreateTemp("", tempfile)
+if err != nil {
+    log.Fatalf("cannot create %v", tempfile)
+}
+defer os.Remove(file.Name())
+
+// ...
+
+// 关闭临时文件
+file.Close()
+
+// 原子重名最终文件
+outfile := fmt.Sprintf("mr-%d-%d.txt", task.TaskNum, i)
+if err := os.Rename(file.Name(), outfile); err != nil {
+    log.Fatal(err)
+}
+```
+
+接下来就需要确认worker是否崩溃, 我设计的策略是worker定时向主机发送心跳消息, 然后主机更新每个worker上次发生心跳消息的时间, 主机单独开一个go线程定时检查每个workers是否超时.
+
+第一次尝试没有通过, 我觉得是因为worker退出后没有释放rpc通信时持有的锁, 因为我现在还是最简单的一把大锁, 所以我决定为每个worker配一把小锁, 主机修改信息的时候使用主机自己的锁, 下面是分配锁的策略:
+
+```
+Done() : a  Coordinator's lock
+
+Task() : a work's lock
+CommitOK : a work's lock
+```
+
+但是这又会影响到我们使用sync.Cond的策略, 在此之前所有等待的RPC处理程序都是在Coordinator's lock上等待的

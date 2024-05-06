@@ -10,6 +10,7 @@ import (
 	"net/rpc"
 	"os"
 	"sort"
+	"time"
 )
 
 // Map functions return a slice of KeyValue.
@@ -35,7 +36,6 @@ func ihash(key string) int {
 func doMap(task tasksMetadata,
 	nReduce int,
 	mapf func(string, string) []KeyValue) []int {
-	fmt.Println("do....")
 
 	var map2reduce []int
 	var file *os.File
@@ -61,7 +61,7 @@ func doMap(task tasksMetadata,
 
 		// 将临时k/v分区存储: MapNum-num
 		for _, kv := range kva {
-			num := ihash(kv.Value) % nReduce
+			num := ihash(kv.Key) % nReduce
 			intermediates[num] = append(intermediates[num], kv)
 		}
 
@@ -74,12 +74,14 @@ func doMap(task tasksMetadata,
 			map2reduce = append(map2reduce, i)
 
 			// 临时文件名格式化"tempfile"
-			tempfile := fmt.Sprintf("mr-%d-%d.txt", task.TaskNum, i)
+			tempfile := fmt.Sprintf("temp-%d.txt", i)
 
 			// 创建临时文件"tempfile"
-			if file, err = os.Create(tempfile); err != nil {
+			if file, err = os.CreateTemp("", tempfile); err != nil {
 				log.Fatalf("cannot create %v", tempfile)
 			}
+			defer os.Remove(file.Name())
+
 			// 使用go的json包写入临时文件"tempfile"
 			enc := json.NewEncoder(file)
 			for _, kv := range intermediates[i] {
@@ -89,20 +91,20 @@ func doMap(task tasksMetadata,
 			}
 			// 关闭临时文件
 			file.Close()
+
+			// 原子重名最终文件
+			outfile := fmt.Sprintf("mr-%d-%d.txt", task.TaskNum, i)
+			if err := os.Rename(file.Name(), outfile); err != nil {
+				log.Fatal(err)
+			}
 		}
 	}
 
-	fmt.Println("over!")
 	return map2reduce
 }
 
 func doReduce(task tasksMetadata,
 	reducef func(string, []string) string) {
-
-	fmt.Println("do....")
-	oname := fmt.Sprintf("mr-out-%d", task.TaskNum)
-	ofile, _ := os.Create(oname)
-
 	var file *os.File
 	var err error
 	var intermediate []KeyValue
@@ -125,6 +127,11 @@ func doReduce(task tasksMetadata,
 		file.Close()
 	}
 
+	// 创建临时文件"tempfile"
+	tempfile := fmt.Sprintf("temp-%d", task.TaskNum)
+	file, _ = os.CreateTemp("", tempfile)
+	defer os.Remove(file.Name())
+
 	// 模仿sequential中的reduce
 	sort.Sort(ByKey(intermediate))
 	i := 0
@@ -138,11 +145,17 @@ func doReduce(task tasksMetadata,
 			values = append(values, intermediate[k].Value)
 		}
 		output := reducef(intermediate[i].Key, values)
-		fmt.Fprintf(ofile, "%v %v\n", intermediate[i].Key, output)
+		fmt.Fprintf(file, "%v %v\n", intermediate[i].Key, output)
 		i = j
 	}
-	ofile.Close()
-	fmt.Println("over!")
+
+	file.Close()
+	outfile := fmt.Sprintf("mr-out-%d", task.TaskNum)
+
+	if err = os.Rename(file.Name(), outfile); err != nil {
+		log.Fatal(err)
+	}
+
 }
 
 func debug_worker(task tasksMetadata) {
@@ -173,23 +186,30 @@ func doTask(
 func Worker(mapf func(string, string) []KeyValue,
 	reducef func(string, []string) string) {
 
+	//fmt.Printf("PID%d 开始执行\n", os.Getpid())
+
+	// 启动心跳
+	go SendHeartbeat(1)
+
 	for {
 		task, jobstate, nReduce := AskTasks() // 请求任务
 		if jobstate == JOBDONE {
 			break
 		} else if jobstate == RPCERROR {
-			log.Fatal("RPCERROR")
+			//fmt.Printf("ID:%d 醒来了!\n", os.Getpid())
+			continue
 		}
-
-		debug_worker(task)
 		intermediates := doTask(task, nReduce, mapf, reducef) // 执行任务
 		CommitTask(task, intermediates)                       // 提交任务
 	}
-	fmt.Println("Worker关闭, JOB完成!")
+	//fmt.Println("Worker关闭, JOB完成!")
 }
 
+// 请求任务
 func AskTasks() (tasksMetadata, int, int) {
-	args := ExampleArgs{}
+	args := ExampleArgs{
+		WorkID: os.Getpid(),
+	}
 	reply := ExampleReply{}
 	if ok := call("Coordinator.Task", &args, &reply); !ok {
 		log.Fatal("call to Coordinator.Task failed")
@@ -197,15 +217,33 @@ func AskTasks() (tasksMetadata, int, int) {
 	return reply.Task, reply.JobState, reply.NReduce
 }
 
+// 提交任务
 func CommitTask(task tasksMetadata, intermediates []int) {
 	args := ExampleArgs{
 		Task:          task,
 		Intermediates: intermediates,
+		WorkID:        os.Getpid(),
 	}
 	reply := ExampleReply{}
 
 	if ok := call("Coordinator.CommitOK", &args, &reply); !ok {
 		log.Fatal("call to Coordinator.CommitOK failed")
+	}
+}
+
+// 发送心跳消息
+func SendHeartbeat(HeartbeatInterval time.Duration) {
+	args := ExampleArgs{
+		WorkID: os.Getpid(),
+	}
+	reply := ExampleReply{}
+	for {
+		// 间隔HeartbeatInterval秒向主机汇报一次
+		if ok := call("Coordinator.Heartbeat", &args, &reply); !ok {
+			log.Fatal("call to Coordinator.Heartbeat failed")
+		}
+		//fmt.Println("heart!")
+		time.Sleep(HeartbeatInterval * time.Second)
 	}
 }
 

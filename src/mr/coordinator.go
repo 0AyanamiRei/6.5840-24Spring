@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/rpc"
 	"os"
+	"sync"
+	"time"
 )
 
 const IDLE = 0
@@ -20,6 +22,18 @@ const JOBDONE = 1
 const JOBDOING = 0
 const RPCERROR = 2
 
+const FREE = 0
+const WORK = 1
+const CRASH = 2
+
+type WorkerStatus struct {
+	LastHeartbeat time.Time
+	TaskType      int
+	TaskNum       int
+	Status        int
+	Mu            sync.Mutex // worker锁
+}
+
 type tasksMetadata struct {
 	TaskType  int      // 任务类型 0:Map,1:Reduce
 	TaskNum   int      // 任务编号
@@ -28,11 +42,15 @@ type tasksMetadata struct {
 }
 
 type Coordinator struct {
-	MapTasks    []tasksMetadata // 管理Map任务
-	ReduceTasks []tasksMetadata // 管理Reduce任务
-	NReduce     int             // 整个JobReduce任务数量
-	NMapped     int             // 已完成的Map任务数量
-	Nfile       int             // 整个Job读取的文件数量(Map任务数量)
+	Mu          sync.Mutex            // 加锁, 必须加大锁
+	Cond        *sync.Cond            // RPCERROR时阻塞RPC处理程序
+	MapTasks    []tasksMetadata       // 管理Map任务
+	ReduceTasks []tasksMetadata       // 管理Reduce任务
+	NReduce     int                   // 整个JobReduce任务数量
+	NMapped     int                   // 已完成的Map任务数量
+	Nfile       int                   // 整个Job读取的文件数量(Map任务数量)
+	Workers     map[int]*WorkerStatus // 管理workers的状态
+	Timeout     time.Duration         // 超过此事件认定worker崩溃
 }
 
 func (c *Coordinator) debug_master(tasktype, num int) {
@@ -45,12 +63,39 @@ func (c *Coordinator) debug_master(tasktype, num int) {
 	}
 }
 
+// 接收心跳消息并更新计时
+func (c *Coordinator) Heartbeat(args *ExampleArgs, reply *ExampleReply) error {
+	// 更新状态
+	c.Mu.Lock()
+	pid := args.WorkID
+	if c.Workers[pid] == nil {
+		c.Workers[pid] = &WorkerStatus{}
+	}
+	c.Mu.Unlock()
+
+	c.Workers[pid].Mu.Lock()
+	defer c.Workers[pid].Mu.Unlock()
+	c.Workers[pid].LastHeartbeat = time.Now()
+	//fmt.Println("worker=", args.WorkID, " time=", c.Workers[args.WorkID].LastHeartbeat,
+	//	" 状态=", c.Workers[args.WorkID].Status)
+	return nil
+}
+
 // 分配任务
 func (c *Coordinator) Task(args *ExampleArgs, reply *ExampleReply) error {
+
+	c.Mu.Lock()
+
+	pid := args.WorkID
+	if c.Workers[pid] == nil {
+		c.Workers[pid] = &WorkerStatus{}
+	}
+
 	var task *tasksMetadata
 	var num int
 	Task := c.MapTasks
 	tasktype := MAP
+
 	if c.NMapped == c.Nfile {
 		Task = c.ReduceTasks
 		tasktype = REDUCE
@@ -64,22 +109,17 @@ func (c *Coordinator) Task(args *ExampleArgs, reply *ExampleReply) error {
 		}
 	}
 
-	// 正常来说Job已完成
+	// 要具体细分是因为Map阶段未完成还是因为整个Job完成导致的nil
 	if task == nil {
 		reply.JobState = JOBDONE
-		// 保守地确认所有tasks是否完成
-		for _, x := range c.ReduceTasks {
-			if x.TaskState != COMPLETED {
-				reply.JobState = RPCERROR
-				return nil
-			}
+
+		if c.NMapped != c.Nfile || c.NReduce != 0 {
+			//fmt.Printf("ID:%d 陷入沉睡!\n", args.WorkID)
+			c.Cond.Wait()
+			reply.JobState = RPCERROR
 		}
-		for _, x := range c.MapTasks {
-			if x.TaskState != COMPLETED {
-				reply.JobState = RPCERROR
-				return nil
-			}
-		}
+
+		c.Mu.Unlock()
 		return nil
 	}
 
@@ -93,14 +133,24 @@ func (c *Coordinator) Task(args *ExampleArgs, reply *ExampleReply) error {
 	reply.Task = *task
 	reply.JobState = JOBDOING
 
-	//debug
-	c.debug_master(tasktype, num)
+	c.Mu.Unlock()
+
+	// 修改Worker信息
+	c.Workers[pid].Mu.Lock()
+	c.Workers[pid].Status = WORK
+	c.Workers[pid].TaskNum = num
+	c.Workers[pid].TaskType = tasktype
+	c.Workers[pid].Mu.Unlock()
 
 	return nil
 }
 
 // 处理结束的任务
 func (c *Coordinator) CommitOK(args *ExampleArgs, reply *ExampleReply) error {
+
+	c.Mu.Lock()
+
+	pid := args.WorkID
 	num := args.Task.TaskNum
 	Task := c.MapTasks
 
@@ -108,7 +158,6 @@ func (c *Coordinator) CommitOK(args *ExampleArgs, reply *ExampleReply) error {
 		Task = c.ReduceTasks
 		c.NReduce--
 	} else {
-		fmt.Println(args.Intermediates)
 		for _, x := range args.Intermediates {
 			filename := fmt.Sprintf("mr-%d-%d.txt", num, x)
 			c.ReduceTasks[x].Filename = append(c.ReduceTasks[x].Filename, filename)
@@ -116,18 +165,38 @@ func (c *Coordinator) CommitOK(args *ExampleArgs, reply *ExampleReply) error {
 		c.NMapped++
 	}
 	Task[num].TaskState = COMPLETED
+
+	c.Workers[pid].Mu.Lock()
+	c.Workers[args.WorkID].Status = FREE
+	c.Workers[pid].Mu.Unlock()
+
+	// 视情况唤醒阻塞的Task线程
+	if args.Task.TaskType == MAP && c.NMapped == c.Nfile {
+		c.Cond.Broadcast()
+	}
+	if args.Task.TaskType == REDUCE && c.NReduce == 0 {
+		c.Cond.Broadcast()
+	}
+
+	c.Mu.Unlock()
+
 	return nil
 }
 
 // 初始化Coordinator实例
-func initCoordinator(files []string, nReduce int) Coordinator {
+func initCoordinator(files []string, nReduce int) *Coordinator {
 	c := Coordinator{
 		MapTasks:    make([]tasksMetadata, 0),
 		ReduceTasks: make([]tasksMetadata, 0),
 		NReduce:     nReduce,
 		NMapped:     0,
 		Nfile:       len(files),
+		Workers:     make(map[int]*WorkerStatus),
+		Timeout:     4,
 	}
+
+	c.Mu = sync.Mutex{}
+	c.Cond = sync.NewCond(&c.Mu)
 
 	// 初始化MapTasks
 	for i, filename := range files {
@@ -149,7 +218,7 @@ func initCoordinator(files []string, nReduce int) Coordinator {
 		}
 		c.ReduceTasks = append(c.ReduceTasks, taskMeta)
 	}
-	return c
+	return &c
 }
 
 // 开启一个监听线程
@@ -170,24 +239,49 @@ func (c *Coordinator) server() {
 func (c *Coordinator) Done() bool {
 	ret := true
 
+	c.Mu.Lock()
+
 	if c.NMapped != c.Nfile || c.NReduce != 0 {
 		ret = false
+		c.Mu.Unlock()
 		return ret
 	}
-	for _, task := range c.MapTasks {
-		if task.TaskState != COMPLETED {
-			ret = false
-			return ret
-		}
-	}
-	for _, task := range c.ReduceTasks {
-		if task.TaskState != COMPLETED {
-			ret = false
-			return ret
-		}
-	}
 
+	c.Mu.Unlock()
 	return ret
+}
+
+// 定期检查每个Workers
+func (c *Coordinator) Heart() {
+	for {
+		time.Sleep(2 * time.Second)
+		now := time.Now()
+		for pid, worker := range c.Workers {
+
+			c.Workers[pid].Mu.Lock()
+
+			if worker.Status == CRASH {
+				c.Workers[pid].Mu.Unlock()
+				continue
+			}
+
+			if now.Sub(worker.LastHeartbeat) > c.Timeout*time.Second {
+
+				worker.Status = CRASH
+				//fmt.Printf("Worker %d has crashed\n", pid)
+
+				if worker.TaskType == REDUCE {
+					c.ReduceTasks[worker.TaskNum].TaskState = IDLE
+				} else {
+					c.MapTasks[worker.TaskNum].TaskState = IDLE
+				}
+				// 必须要唤醒
+				c.Cond.Broadcast()
+			}
+
+			c.Workers[pid].Mu.Unlock()
+		}
+	}
 }
 
 // create a Coordinator.
@@ -196,5 +290,6 @@ func (c *Coordinator) Done() bool {
 func MakeCoordinator(files []string, nReduce int) *Coordinator {
 	c := initCoordinator(files, nReduce)
 	c.server()
-	return &c
+	go c.Heart()
+	return c
 }

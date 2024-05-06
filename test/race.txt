@@ -1,0 +1,311 @@
+*** Starting map parallelism test.
+fatal error: concurrent map writes
+
+goroutine 20 [running]:
+6.5840/mr.(*Coordinator).Heartbeat(0xc0000ce1c0, 0xc0003141b0?, 0x1?)
+        /home/refrain/6.5840-24Spring/src/mr/coordinator.go:71 +0x87
+reflect.Value.call({0xc000090600?, 0xc000014610?, 0x13?}, {0x7a9965, 0x4}, {0xc00011cef8, 0x3, 0x3?})
+        /usr/local/go/src/reflect/value.go:586 +0xb0b
+reflect.Value.Call({0xc000090600?, 0xc000014610?, 0xc0000606c8?}, {0xc0000606f8?, 0xc0001220a0?, 0x50?})
+        /usr/local/go/src/reflect/value.go:370 +0xbc
+net/rpc.(*service).call(0xc00007f640, 0xc0001220a0?, 0x0?, 0xc00001a360, 0xc000034200, 0xc0001220a0?, {0x734c00?, 0xc0001220f0?, 0x6910e6?}, {0x734c40, ...}, ...)
+        /usr/local/go/src/net/rpc/server.go:382 +0x226
+created by net/rpc.(*Server).ServeCodec
+        /usr/local/go/src/net/rpc/server.go:479 +0x3fe
+
+goroutine 1 [sleep]:
+time.Sleep(0x3b9aca00)
+        /usr/local/go/src/runtime/time.go:195 +0x135
+main.main()
+        /home/refrain/6.5840-24Spring/src/main/mrcoordinator.go:28 +0xa5
+
+goroutine 6 [IO wait]:
+internal/poll.runtime_pollWait(0x7f691001a818, 0x72)
+        /usr/local/go/src/runtime/netpoll.go:306 +0x89
+internal/poll.(*pollDesc).wait(0xc000034300?, 0x16?, 0x0)
+        /usr/local/go/src/internal/poll/fd_poll_runtime.go:84 +0x32
+internal/poll.(*pollDesc).waitRead(...)
+        /usr/local/go/src/internal/poll/fd_poll_runtime.go:89
+internal/poll.(*FD).Accept(0xc000034300)
+        /usr/local/go/src/internal/poll/fd_unix.go:614 +0x2bd
+net.(*netFD).accept(0xc000034300)
+        /usr/local/go/src/net/fd_unix.go:172 +0x35
+net.(*UnixListener).accept(0x465eae?)
+        /usr/local/go/src/net/unixsock_posix.go:172 +0x1c
+net.(*UnixListener).Accept(0xc0000f02d0)
+        /usr/local/go/src/net/unixsock.go:260 +0x3d
+net/http.(*Server).Serve(0xc0000f6000, {0x8408a0, 0xc0000f02d0})
+        /usr/local/go/src/net/http/server.go:3059 +0x385
+net/http.Serve({0x8408a0, 0xc0000f02d0}, {0x0?, 0x0})
+        /usr/local/go/src/net/http/server.go:2581 +0x74
+created by 6.5840/mr.(*Coordinator).server
+        /home/refrain/6.5840-24Spring/src/mr/coordinator.go:231 +0x12b
+
+goroutine 7 [sleep]:
+time.Sleep(0x77359400)
+        /usr/local/go/src/runtime/time.go:195 +0x135
+6.5840/mr.(*Coordinator).Heart(0xc0000ce1c0)
+        /home/refrain/6.5840-24Spring/src/mr/coordinator.go:253 +0x38
+created by 6.5840/mr.MakeCoordinator
+        /home/refrain/6.5840-24Spring/src/mr/coordinator.go:289 +0x6a
+
+goroutine 8 [IO wait]:
+internal/poll.runtime_pollWait(0x7f691001a728, 0x72)
+        /usr/local/go/src/runtime/netpoll.go:306 +0x89
+internal/poll.(*pollDesc).wait(0xc000034500?, 0xc000285000?, 0x0)
+        /usr/local/go/src/internal/poll/fd_poll_runtime.go:84 +0x32
+internal/poll.(*pollDesc).waitRead(...)
+        /usr/local/go/src/internal/poll/fd_poll_runtime.go:89
+internal/poll.(*FD).Read(0xc000034500, {0xc000285000, 0x1000, 0x1000})
+        /usr/local/go/src/internal/poll/fd_unix.go:167 +0x299
+net.(*netFD).Read(0xc000034500, {0xc000285000?, 0x0?, 0x0?})
+        /usr/local/go/src/net/fd_posix.go:55 +0x29
+net.(*conn).Read(0xc000014650, {0xc000285000?, 0x49c006?, 0xc00031b468?})
+        /usr/local/go/src/net/net.go:183 +0x45
+bufio.(*Reader).Read(0xc000090960, {0xc00001a370, 0x1, 0x6b4d1d?})
+        /usr/local/go/src/bufio/bufio.go:237 +0x1bb
+io.ReadAtLeast({0x83e2a0, 0xc000090960}, {0xc00001a370, 0x1, 0x9}, 0x1)
+        /usr/local/go/src/io/io.go:332 +0x9a
+io.ReadFull(...)
+        /usr/local/go/src/io/io.go:351
+encoding/gob.decodeUintReader({0x83e2a0?, 0xc000090960?}, {0xc00001a370?, 0x9?, 0x9?})
+        /usr/local/go/src/encoding/gob/decode.go:116 +0x57
+encoding/gob.(*Decoder).recvMessage(0xc000034880)
+        /usr/local/go/src/encoding/gob/decoder.go:82 +0x39
+encoding/gob.(*Decoder).decodeTypeSequence(0xc000034880, 0x0)
+        /usr/local/go/src/encoding/gob/decoder.go:148 +0x4f
+encoding/gob.(*Decoder).DecodeValue(0xc000034880, {0x738d80?, 0xc00007c860?, 0xc00031b668?})
+        /usr/local/go/src/encoding/gob/decoder.go:227 +0x18f
+encoding/gob.(*Decoder).Decode(0xc000034880, {0x738d80?, 0xc00007c860?})
+        /usr/local/go/src/encoding/gob/decoder.go:204 +0x165
+net/rpc.(*gobServerCodec).ReadRequestHeader(0xc00007f5c0?, 0x40f06a?)
+        /usr/local/go/src/net/rpc/server.go:402 +0x27
+net/rpc.(*Server).readRequestHeader(0xc00007f5c0, {0x840e00, 0xc0000f0720})
+        /usr/local/go/src/net/rpc/server.go:588 +0x66
+net/rpc.(*Server).readRequest(0x0?, {0x840e00, 0xc0000f0720})
+        /usr/local/go/src/net/rpc/server.go:548 +0x3b
+net/rpc.(*Server).ServeCodec(0xc00007f5c0, {0x840e00?, 0xc0000f0720})
+        /usr/local/go/src/net/rpc/server.go:463 +0x87
+net/rpc.(*Server).ServeConn(0x7f691001f248?, {0x7f6910020ab8?, 0xc000014650})
+        /usr/local/go/src/net/rpc/server.go:454 +0x34e
+net/rpc.(*Server).ServeHTTP(0xc000034500?, {0x840a50?, 0xc0001a6000}, 0xc00019c000)
+        /usr/local/go/src/net/rpc/server.go:709 +0x2f7
+net/http.(*ServeMux).ServeHTTP(0x0?, {0x840a50, 0xc0001a6000}, 0xc00019c000)
+        /usr/local/go/src/net/http/server.go:2500 +0x149
+net/http.serverHandler.ServeHTTP({0xc000190030?}, {0x840a50, 0xc0001a6000}, 0xc00019c000)
+        /usr/local/go/src/net/http/server.go:2936 +0x316
+net/http.(*conn).serve(0xc000016120, {0x840c78, 0xc0000f03f0})
+        /usr/local/go/src/net/http/server.go:1995 +0x612
+created by net/http.(*Server).Serve
+        /usr/local/go/src/net/http/server.go:3089 +0x5ed
+
+goroutine 9 [IO wait]:
+internal/poll.runtime_pollWait(0x7f691001a638, 0x72)
+        /usr/local/go/src/runtime/netpoll.go:306 +0x89
+internal/poll.(*pollDesc).wait(0xc000034700?, 0xc000282000?, 0x0)
+        /usr/local/go/src/internal/poll/fd_poll_runtime.go:84 +0x32
+internal/poll.(*pollDesc).waitRead(...)
+        /usr/local/go/src/internal/poll/fd_poll_runtime.go:89
+internal/poll.(*FD).Read(0xc000034700, {0xc000282000, 0x1000, 0x1000})
+        /usr/local/go/src/internal/poll/fd_unix.go:167 +0x299
+net.(*netFD).Read(0xc000034700, {0xc000282000?, 0x0?, 0x0?})
+        /usr/local/go/src/net/fd_posix.go:55 +0x29
+net.(*conn).Read(0xc000014658, {0xc000282000?, 0x49c006?, 0xc0000e7468?})
+        /usr/local/go/src/net/net.go:183 +0x45
+bufio.(*Reader).Read(0xc0000908a0, {0xc00001a350, 0x1, 0x6b4d1d?})
+        /usr/local/go/src/bufio/bufio.go:237 +0x1bb
+io.ReadAtLeast({0x83e2a0, 0xc0000908a0}, {0xc00001a350, 0x1, 0x9}, 0x1)
+        /usr/local/go/src/io/io.go:332 +0x9a
+io.ReadFull(...)
+        /usr/local/go/src/io/io.go:351
+encoding/gob.decodeUintReader({0x83e2a0?, 0xc0000908a0?}, {0xc00001a350?, 0x9?, 0x9?})
+        /usr/local/go/src/encoding/gob/decode.go:116 +0x57
+encoding/gob.(*Decoder).recvMessage(0xc000034800)
+        /usr/local/go/src/encoding/gob/decoder.go:82 +0x39
+encoding/gob.(*Decoder).decodeTypeSequence(0xc000034800, 0x0)
+        /usr/local/go/src/encoding/gob/decoder.go:148 +0x4f
+encoding/gob.(*Decoder).DecodeValue(0xc000034800, {0x738d80?, 0xc0001122a0?, 0xc0000e7668?})
+        /usr/local/go/src/encoding/gob/decoder.go:227 +0x18f
+encoding/gob.(*Decoder).Decode(0xc000034800, {0x738d80?, 0xc0001122a0?})
+        /usr/local/go/src/encoding/gob/decoder.go:204 +0x165
+net/rpc.(*gobServerCodec).ReadRequestHeader(0xc00007f5c0?, 0x40f06a?)
+        /usr/local/go/src/net/rpc/server.go:402 +0x27
+net/rpc.(*Server).readRequestHeader(0xc00007f5c0, {0x840e00, 0xc0000f0630})
+        /usr/local/go/src/net/rpc/server.go:588 +0x66
+net/rpc.(*Server).readRequest(0x0?, {0x840e00, 0xc0000f0630})
+        /usr/local/go/src/net/rpc/server.go:548 +0x3b
+net/rpc.(*Server).ServeCodec(0xc00007f5c0, {0x840e00?, 0xc0000f0630})
+        /usr/local/go/src/net/rpc/server.go:463 +0x87
+net/rpc.(*Server).ServeConn(0x7f691001f248?, {0x7f6910020ab8?, 0xc000014658})
+        /usr/local/go/src/net/rpc/server.go:454 +0x34e
+net/rpc.(*Server).ServeHTTP(0xc000034700?, {0x840a50?, 0xc0000ee1c0}, 0xc0000ec100)
+        /usr/local/go/src/net/rpc/server.go:709 +0x2f7
+net/http.(*ServeMux).ServeHTTP(0x0?, {0x840a50, 0xc0000ee1c0}, 0xc0000ec100)
+        /usr/local/go/src/net/http/server.go:2500 +0x149
+net/http.serverHandler.ServeHTTP({0xc0000f0480?}, {0x840a50, 0xc0000ee1c0}, 0xc0000ec100)
+        /usr/local/go/src/net/http/server.go:2936 +0x316
+net/http.(*conn).serve(0xc0000161b0, {0x840c78, 0xc0000f03f0})
+        /usr/local/go/src/net/http/server.go:1995 +0x612
+created by net/http.(*Server).Serve
+        /usr/local/go/src/net/http/server.go:3089 +0x5ed
+
+goroutine 18 [IO wait]:
+internal/poll.runtime_pollWait(0x7f691001a548, 0x72)
+        /usr/local/go/src/runtime/netpoll.go:306 +0x89
+internal/poll.(*pollDesc).wait(0xc00010e080?, 0xc00013c000?, 0x0)
+        /usr/local/go/src/internal/poll/fd_poll_runtime.go:84 +0x32
+internal/poll.(*pollDesc).waitRead(...)
+        /usr/local/go/src/internal/poll/fd_poll_runtime.go:89
+internal/poll.(*FD).Read(0xc00010e080, {0xc00013c000, 0x1000, 0x1000})
+        /usr/local/go/src/internal/poll/fd_unix.go:167 +0x299
+net.(*netFD).Read(0xc00010e080, {0xc00013c000?, 0x0?, 0x0?})
+        /usr/local/go/src/net/fd_posix.go:55 +0x29
+net.(*conn).Read(0xc000114000, {0xc00013c000?, 0x49c006?, 0xc00031f468?})
+        /usr/local/go/src/net/net.go:183 +0x45
+bufio.(*Reader).Read(0xc0001260c0, {0xc00013e000, 0x1, 0x6b4d1d?})
+        /usr/local/go/src/bufio/bufio.go:237 +0x1bb
+io.ReadAtLeast({0x83e2a0, 0xc0001260c0}, {0xc00013e000, 0x1, 0x9}, 0x1)
+        /usr/local/go/src/io/io.go:332 +0x9a
+io.ReadFull(...)
+        /usr/local/go/src/io/io.go:351
+encoding/gob.decodeUintReader({0x83e2a0?, 0xc0001260c0?}, {0xc00013e000?, 0x9?, 0x9?})
+        /usr/local/go/src/encoding/gob/decode.go:116 +0x57
+encoding/gob.(*Decoder).recvMessage(0xc00010e180)
+        /usr/local/go/src/encoding/gob/decoder.go:82 +0x39
+encoding/gob.(*Decoder).decodeTypeSequence(0xc00010e180, 0x0)
+        /usr/local/go/src/encoding/gob/decoder.go:148 +0x4f
+encoding/gob.(*Decoder).DecodeValue(0xc00010e180, {0x738d80?, 0xc00030c220?, 0xc00031f668?})
+        /usr/local/go/src/encoding/gob/decoder.go:227 +0x18f
+encoding/gob.(*Decoder).Decode(0xc00010e180, {0x738d80?, 0xc00030c220?})
+        /usr/local/go/src/encoding/gob/decoder.go:204 +0x165
+net/rpc.(*gobServerCodec).ReadRequestHeader(0xc00007f5c0?, 0x40f06a?)
+        /usr/local/go/src/net/rpc/server.go:402 +0x27
+net/rpc.(*Server).readRequestHeader(0xc00007f5c0, {0x840e00, 0xc0001201e0})
+        /usr/local/go/src/net/rpc/server.go:588 +0x66
+net/rpc.(*Server).readRequest(0x40e8de?, {0x840e00, 0xc0001201e0})
+        /usr/local/go/src/net/rpc/server.go:548 +0x3b
+net/rpc.(*Server).ServeCodec(0xc00007f5c0, {0x840e00?, 0xc0001201e0})
+        /usr/local/go/src/net/rpc/server.go:463 +0x87
+net/rpc.(*Server).ServeConn(0x7f691001f248?, {0x7f6910020ab8?, 0xc000114000})
+        /usr/local/go/src/net/rpc/server.go:454 +0x34e
+net/rpc.(*Server).ServeHTTP(0xc00010e080?, {0x840a50?, 0xc000134000}, 0xc00012c000)
+        /usr/local/go/src/net/rpc/server.go:709 +0x2f7
+net/http.(*ServeMux).ServeHTTP(0x0?, {0x840a50, 0xc000134000}, 0xc00012c000)
+        /usr/local/go/src/net/http/server.go:2500 +0x149
+net/http.serverHandler.ServeHTTP({0xc000120030?}, {0x840a50, 0xc000134000}, 0xc00012c000)
+        /usr/local/go/src/net/http/server.go:2936 +0x316
+net/http.(*conn).serve(0xc000116000, {0x840c78, 0xc0000f03f0})
+        /usr/local/go/src/net/http/server.go:1995 +0x612
+created by net/http.(*Server).Serve
+        /usr/local/go/src/net/http/server.go:3089 +0x5ed
+
+goroutine 12 [runnable]:
+encoding/gob.compileEnc(0xc00007ea00, 0xc0000db8e8?)
+        /usr/local/go/src/encoding/gob/encode.go:643 +0x3a5
+encoding/gob.buildEncEngine(0xc00007c220, 0xc0000db488?, 0xc0000db8e8)
+        /usr/local/go/src/encoding/gob/encode.go:684 +0x19f
+encoding/gob.getEncEngine(0x8451b0?, 0x76dea0?)
+        /usr/local/go/src/encoding/gob/encode.go:666 +0x45
+encoding/gob.encOpFor({0x8451b0, 0x776160}, 0x0?, 0x0?)
+        /usr/local/go/src/encoding/gob/encode.go:575 +0x31c
+encoding/gob.compileEnc(0xc00007f300, 0xc0000db8e8?)
+        /usr/local/go/src/encoding/gob/encode.go:642 +0x30a
+encoding/gob.buildEncEngine(0xc00007c1a0, 0x404ac5?, 0x0)
+        /usr/local/go/src/encoding/gob/encode.go:684 +0x19f
+encoding/gob.getEncEngine(0x8?, 0xc0000dba18?)
+        /usr/local/go/src/encoding/gob/encode.go:666 +0x45
+encoding/gob.(*Encoder).encode(0xc0000b1040, 0x920000c000304330?, {0x751b80?, 0xc000302380?, 0xc0000dbb00?}, 0xc00007f300)
+        /usr/local/go/src/encoding/gob/encode.go:692 +0xb9
+encoding/gob.(*Encoder).sendActualType(0xc0000b1040, {0x83e2c0, 0xc00007fb00}, 0xc00007fe00, 0xc000302340, {0x8451b0, 0x7861a0})
+        /usr/local/go/src/encoding/gob/encoder.go:106 +0x1bb
+encoding/gob.(*Encoder).sendType(0x7f69393ea108?, {0x83e2c0, 0xc00007fb00}, 0xc00007fe00?, {0x8451b0?, 0x7861a0?})
+        /usr/local/go/src/encoding/gob/encoder.go:169 +0x105
+encoding/gob.(*Encoder).sendTypeDescriptor(0xc0000b1040, {0x83e2c0, 0xc00007fb00}, 0x0?, 0xc0003022c0)
+        /usr/local/go/src/encoding/gob/encoder.go:191 +0x9e
+encoding/gob.(*Encoder).EncodeValue(0xc0000b1040, {0x738dc0?, 0xc0000f0ae0?, 0xa62a00?})
+        /usr/local/go/src/encoding/gob/encoder.go:244 +0x3eb
+encoding/gob.(*Encoder).Encode(0x30?, {0x738dc0?, 0xc0000f0ae0?})
+        /usr/local/go/src/encoding/gob/encoder.go:176 +0xa5
+net/rpc.(*gobServerCodec).WriteResponse(0xc0000f0720, 0x49ec9c?, {0x734c40, 0xc00007fdc0})
+        /usr/local/go/src/net/rpc/server.go:410 +0x45
+net/rpc.(*Server).sendResponse(0x734c40?, 0xc00001a380, 0xc00007c620, {0x734c40, 0xc00007fdc0}, {0x840e00, 0xc0000f0720}, {0x0, 0x0})
+        /usr/local/go/src/net/rpc/server.go:358 +0x153
+net/rpc.(*service).call(0xc00007f640, 0xc00009a550?, 0x0?, 0xc00001a390, 0xc000034280, 0xc00009a550?, {0x734c00?, 0xc00009a5a0?, 0x6910e6?}, {0x734c40, ...}, ...)
+        /usr/local/go/src/net/rpc/server.go:389 +0x2e6
+created by net/rpc.(*Server).ServeCodec
+        /usr/local/go/src/net/rpc/server.go:479 +0x3fe
+
+goroutine 34 [runnable]:
+internal/saferio.ReadData({0x83e2a0, 0xc0002260c0}, 0x2f)
+        /usr/local/go/src/internal/saferio/io.go:36 +0x65
+encoding/gob.(*Decoder).readMessage(0xc00020e180, 0xc0002260c0?)
+        /usr/local/go/src/encoding/gob/decoder.go:103 +0x45
+encoding/gob.(*Decoder).recvMessage(0xc00020e180)
+        /usr/local/go/src/encoding/gob/decoder.go:91 +0xce
+encoding/gob.(*Decoder).decodeTypeSequence(0xc00020e180, 0x0)
+        /usr/local/go/src/encoding/gob/decoder.go:148 +0x4f
+encoding/gob.(*Decoder).DecodeValue(0xc00020e180, {0x738d80?, 0xc000212060?, 0xc000118668?})
+        /usr/local/go/src/encoding/gob/decoder.go:227 +0x18f
+encoding/gob.(*Decoder).Decode(0xc00020e180, {0x738d80?, 0xc000212060?})
+        /usr/local/go/src/encoding/gob/decoder.go:204 +0x165
+net/rpc.(*gobServerCodec).ReadRequestHeader(0xc00007f5c0?, 0xc0001186c0?)
+        /usr/local/go/src/net/rpc/server.go:402 +0x27
+net/rpc.(*Server).readRequestHeader(0xc00007f5c0, {0x840e00, 0xc0002201e0})
+        /usr/local/go/src/net/rpc/server.go:588 +0x66
+net/rpc.(*Server).readRequest(0x40e8de?, {0x840e00, 0xc0002201e0})
+        /usr/local/go/src/net/rpc/server.go:548 +0x3b
+net/rpc.(*Server).ServeCodec(0xc00007f5c0, {0x840e00?, 0xc0002201e0})
+        /usr/local/go/src/net/rpc/server.go:463 +0x87
+net/rpc.(*Server).ServeConn(0x7f691001f248?, {0x7f6910020ab8?, 0xc000214000})
+        /usr/local/go/src/net/rpc/server.go:454 +0x34e
+net/rpc.(*Server).ServeHTTP(0xc00020e080?, {0x840a50?, 0xc000234000}, 0xc00022c000)
+        /usr/local/go/src/net/rpc/server.go:709 +0x2f7
+net/http.(*ServeMux).ServeHTTP(0x0?, {0x840a50, 0xc000234000}, 0xc00022c000)
+        /usr/local/go/src/net/http/server.go:2500 +0x149
+net/http.serverHandler.ServeHTTP({0xc000220030?}, {0x840a50, 0xc000234000}, 0xc00022c000)
+        /usr/local/go/src/net/http/server.go:2936 +0x316
+net/http.(*conn).serve(0xc000216000, {0x840c78, 0xc0000f03f0})
+        /usr/local/go/src/net/http/server.go:1995 +0x612
+created by net/http.(*Server).Serve
+        /usr/local/go/src/net/http/server.go:3089 +0x5ed
+
+goroutine 50 [sync.Mutex.Lock]:
+sync.runtime_SemacquireMutex(0x404ac5?, 0x99?, 0x798ba0?)
+        /usr/local/go/src/runtime/sema.go:77 +0x26
+sync.(*Mutex).lockSlow(0xc00007c1a4)
+        /usr/local/go/src/sync/mutex.go:171 +0x165
+sync.(*Mutex).Lock(...)
+        /usr/local/go/src/sync/mutex.go:90
+encoding/gob.buildEncEngine(0xc00007c1a0, 0x8451b0?, 0x0)
+        /usr/local/go/src/encoding/gob/encode.go:676 +0xb3
+encoding/gob.getEncEngine(0xc0000ad380?, 0xc0000ad380?)
+        /usr/local/go/src/encoding/gob/encode.go:666 +0x45
+encoding/gob.(*Encoder).encode(0xc000140000, 0xc0000d5ae8?, {0x751b80?, 0xc000302380?, 0xc000120420?}, 0xc00007f300)
+        /usr/local/go/src/encoding/gob/encode.go:692 +0xb9
+encoding/gob.(*Encoder).sendActualType(0xc000140000, {0x83e2c0, 0xc00012a100}, 0xc000302300, 0xc000302340, {0x8451b0, 0x7861a0})
+        /usr/local/go/src/encoding/gob/encoder.go:106 +0x1bb
+encoding/gob.(*Encoder).sendType(0x7f69393eb3c8?, {0x83e2c0, 0xc00012a100}, 0xc000302300?, {0x8451b0?, 0x7861a0?})
+        /usr/local/go/src/encoding/gob/encoder.go:169 +0x105
+encoding/gob.(*Encoder).sendTypeDescriptor(0xc000140000, {0x83e2c0, 0xc00012a100}, 0x0?, 0xc0003022c0)
+        /usr/local/go/src/encoding/gob/encoder.go:191 +0x9e
+encoding/gob.(*Encoder).EncodeValue(0xc000140000, {0x738dc0?, 0xc0003043c0?, 0xc000200000?})
+        /usr/local/go/src/encoding/gob/encoder.go:244 +0x3eb
+encoding/gob.(*Encoder).Encode(0x30?, {0x738dc0?, 0xc0003043c0?})
+        /usr/local/go/src/encoding/gob/encoder.go:176 +0xa5
+net/rpc.(*gobServerCodec).WriteResponse(0xc0001201e0, 0x49ec9c?, {0x734c40, 0xc000302240})
+        /usr/local/go/src/net/rpc/server.go:410 +0x45
+net/rpc.(*Server).sendResponse(0x734c40?, 0xc00013e010, 0xc000112060, {0x734c40, 0xc000302240}, {0x840e00, 0xc0001201e0}, {0x0, 0x0})
+        /usr/local/go/src/net/rpc/server.go:358 +0x153
+net/rpc.(*service).call(0xc00007f640, 0x0?, 0x0?, 0xc00013e020, 0xc000034280, 0x0?, {0x734c00?, 0xc000324000?, 0x0?}, {0x734c40, ...}, ...)
+        /usr/local/go/src/net/rpc/server.go:389 +0x2e6
+created by net/rpc.(*Server).ServeCodec
+        /usr/local/go/src/net/rpc/server.go:479 +0x3fe
+unexpected EOF
+unexpected EOF
+unexpected EOF
+unexpected EOF
+2024/05/06 10:32:23 call to Coordinator.Heartbeat failed
+2024/05/06 10:32:23 call to Coordinator.Task failed
+cat: 'mr-out*': No such file or directory
+--- saw 0 workers rather than 2
+--- map parallelism test: FAIL

@@ -20,6 +20,7 @@ type ExampleArgs struct {
 	// worker->master
 	Task          tasksMetadata
 	Intermediates []int
+	WorkID        int
 }
 
 type ExampleReply struct {

@@ -155,7 +155,6 @@ func doReduce(task tasksMetadata,
 	if err = os.Rename(file.Name(), outfile); err != nil {
 		log.Fatal(err)
 	}
-
 }
 
 func debug_worker(task tasksMetadata) {
@@ -182,27 +181,22 @@ func doTask(
 	}
 }
 
-// main/mrworker.go calls this function.
 func Worker(mapf func(string, string) []KeyValue,
 	reducef func(string, []string) string) {
-
-	//fmt.Printf("PID%d 开始执行\n", os.Getpid())
-
 	// 启动心跳
 	go SendHeartbeat(1)
 
+	// 请求&等待 任务调度
 	for {
 		task, jobstate, nReduce := AskTasks() // 请求任务
 		if jobstate == JOBDONE {
 			break
 		} else if jobstate == RPCERROR {
-			//fmt.Printf("ID:%d 醒来了!\n", os.Getpid())
 			continue
 		}
 		intermediates := doTask(task, nReduce, mapf, reducef) // 执行任务
 		CommitTask(task, intermediates)                       // 提交任务
 	}
-	//fmt.Println("Worker关闭, JOB完成!")
 }
 
 // 请求任务
@@ -238,11 +232,9 @@ func SendHeartbeat(HeartbeatInterval time.Duration) {
 	}
 	reply := ExampleReply{}
 	for {
-		// 间隔HeartbeatInterval秒向主机汇报一次
 		if ok := call("Coordinator.Heartbeat", &args, &reply); !ok {
 			log.Fatal("call to Coordinator.Heartbeat failed")
 		}
-		//fmt.Println("heart!")
 		time.Sleep(HeartbeatInterval * time.Second)
 	}
 }

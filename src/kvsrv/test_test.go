@@ -1,14 +1,15 @@
 package kvsrv
 
 import (
+	"log"
+	"runtime"
+
 	"6.5840/models"
 	"6.5840/porcupine"
 
 	"fmt"
 	"io/ioutil"
-	"log"
 	"math/rand"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -220,10 +221,12 @@ func GenericTest(t *testing.T, nclients int, unreliable bool, randomkeys bool) {
 	ck := cfg.makeClient()
 
 	done_clients := int32(0)
+
 	clnts := make([]chan int, nclients)
 	for i := 0; i < nclients; i++ {
 		clnts[i] = make(chan int)
 	}
+
 	for i := 0; i < NITER; i++ {
 		//log.Printf("Iteration %v\n", i)
 		atomic.StoreInt32(&done_clients, 0)
@@ -372,6 +375,7 @@ const (
 	MiB = 1 << 20
 )
 
+// mem1测试
 func TestMemGet2(t *testing.T) {
 	const MEM = 10 // in MiB
 
@@ -400,13 +404,15 @@ func TestMemGet2(t *testing.T) {
 
 	runtime.ReadMemStats(&st)
 	m := st.HeapAlloc / MiB
+
 	if m >= MEM {
-		t.Fatalf("error: server using too much memory %d\n", m)
+		t.Fatalf("error: server using too much memory %d(should less than %d)\n", m, MEM)
 	}
 
 	cfg.end()
 }
 
+// mem2测试
 func TestMemPut2(t *testing.T) {
 	const MEM = 10 // in MiB
 
@@ -428,11 +434,12 @@ func TestMemPut2(t *testing.T) {
 	runtime.ReadMemStats(&st)
 	m := st.HeapAlloc / MiB
 	if m >= MEM {
-		t.Fatalf("error: server using too much memory %d\n", m)
+		t.Fatalf("error: server using too much memory %d(should be %d)\n", m, MEM)
 	}
 	cfg.end()
 }
 
+// mem3测试
 func TestMemAppend2(t *testing.T) {
 	const MEM = 10 // in MiB
 
@@ -454,11 +461,12 @@ func TestMemAppend2(t *testing.T) {
 	runtime.ReadMemStats(&st)
 	m := st.HeapAlloc / MiB
 	if m > 3*MEM {
-		t.Fatalf("error: server using too much memory %d\n", m)
+		t.Fatalf("error: server using too much memory %d(should be %d)\n", m, 3*MEM)
 	}
 	cfg.end()
 }
 
+// mem4测试
 func TestMemPutManyClients(t *testing.T) {
 	const (
 		NCLIENT = 100_000
@@ -509,6 +517,7 @@ func TestMemPutManyClients(t *testing.T) {
 	cfg.end()
 }
 
+// mem5测试
 func TestMemGetManyClients(t *testing.T) {
 	const (
 		NCLIENT = 100_000
@@ -562,6 +571,7 @@ func TestMemGetManyClients(t *testing.T) {
 	cfg.end()
 }
 
+// mem6测试
 func TestMemManyAppends(t *testing.T) {
 	const (
 		N   = 1000

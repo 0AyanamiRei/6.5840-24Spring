@@ -123,7 +123,7 @@ args := GetArgs{
 reply := GetReply{}
 
 // 不断发送请求
-for ok := ck.server.Call("KVServer.Get", &args, &reply); !ok; {}
+for !ck.server.Call("KVServer.Get", &args, &reply) {}
 ```
 
 需要注意的是, 可能你担心发送的频率是否过高, 但是在我检查后发现, 在这次实验中, 一次操作所重复发送的rpc消息, 最多个位数(2-4)次, 所以不必发送后睡眠一段时间.
@@ -153,3 +153,64 @@ reply.Value = kv.data[key]
 如果缓存的数据不清理掉的话, 关于内存的测试是无法通过的, 或者说我觉得去缓存数据本身是一个很蠢的行为, 可以思考一下有无不缓存数据本身同时又能保持幂等的操作.
 
 我们暂时采取另一个解决方法, 即让客户端确切收到消息后向服务器发送消息主动清理掉缓存内容
+
+```go
+// 客户端的Put/Get/Append
+...
+clearArgs := ClearArgs{
+  OpReg: args.OpReg,
+}
+clearReply := ClearReply{}
+
+for !ck.server.Call("KVServer.Clear", &clearArgs, &clearReply) {}
+
+// KVServer.Clear
+func (kv *KVServer) Clear(args *ClearArgs, reply *ClearReply) {
+	kv.mu.Lock()
+	defer kv.mu.Unlock()
+	delete(kv.OpCache, args.OpReg)
+}
+```
+
+这样写能够稳定通过:
+
+```sh
+go test
+Test: one client ...
+info: linearizability check timed out, assuming history is ok
+  ... Passed -- t  4.3 nrpc 47462 ops 23731
+Test: many clients ...
+info: linearizability check timed out, assuming history is ok
+  ... Passed -- t  4.7 nrpc 152896 ops 76448
+Test: unreliable net, many clients ...
+  ... Passed -- t  3.4 nrpc  1168 ops  475
+Test: concurrent append to same key, unreliable ...
+  ... Passed -- t  0.5 nrpc   121 ops   52
+Test: memory use get ...
+  ... Passed -- t  0.3 nrpc     9 ops    0
+Test: memory use put ...
+  ... Passed -- t  0.1 nrpc     4 ops    0
+Test: memory use append ...
+  ... Passed -- t  0.2 nrpc     4 ops    0
+Test: memory use many put clients ...
+  ... Passed -- t 31.6 nrpc 200000 ops    0
+Test: memory use many get client ...
+  ... Passed -- t 35.2 nrpc 200002 ops    0
+Test: memory use many appends ...
+2024/05/12 16:15:27 m0 479552 m1 1484128
+  ... Passed -- t  1.7 nrpc  2000 ops    0
+PASS
+ok      6.5840/kvsrv    83.594s
+```
+
+但是发现用时很久,因为别人有写过50多秒测试就能结束的, 所以我想要再改进一些
+
+### 方案2
+
+方案2是我之前写过, 但是没有成功通过测试的, 即利用hints提到的: 我们可以假设一个客户端一次只会请求一个操作.
+
+具体的可以参考这些博客内容:
+
+https://balddemian.github.io/
+
+https://dinglang.net/posts/77#comment-5

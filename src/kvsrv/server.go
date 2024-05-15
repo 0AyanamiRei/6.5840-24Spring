@@ -21,6 +21,7 @@ type KVServer struct {
 	OpCache map[int64]string
 }
 
+// 为了放置内存爆, 每次操作结束会清理该缓存值
 func (kv *KVServer) Clear(args *ClearArgs, reply *ClearReply) {
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
@@ -29,21 +30,21 @@ func (kv *KVServer) Clear(args *ClearArgs, reply *ClearReply) {
 
 func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 	key := args.Key
-	opReg := args.OpReg
+	//opReg := args.OpReg
 
 	kv.mu.Lock()
 	defer kv.mu.Unlock()
 
-	value, ok := kv.OpCache[opReg]
+	// value, ok := kv.OpCache[opReg]
 
-	// 滤去重复rpc
-	if ok {
-		reply.Value = value
-		return
-	}
+	// // 滤去重复rpc
+	// if ok {
+	// 	reply.Value = value
+	// 	return
+	// }
 
-	// 缓存此次的rpc返回值
-	kv.OpCache[opReg] = kv.data[key]
+	// // 缓存此次的rpc返回值
+	// kv.OpCache[opReg] = kv.data[key]
 	reply.Value = kv.data[key]
 }
 
@@ -109,6 +110,7 @@ func (kv *KVServer) ClearClients(t int) {
 }
 
 func StartKVServer() *KVServer {
+	//fmt.Print("KVServer")
 	kv := &KVServer{
 		mu:      sync.Mutex{},
 		data:    make(map[string]string),

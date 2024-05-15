@@ -20,6 +20,7 @@ func nrand() int64 {
 }
 
 func MakeClerk(server *labrpc.ClientEnd) *Clerk {
+	//fmt.Println("MakeClerk")
 	ck := &Clerk{
 		server: server,
 	}
@@ -38,14 +39,14 @@ func (ck *Clerk) Get(key string) string {
 	for !ck.server.Call("KVServer.Get", &args, &reply) {
 	}
 
-	// 发送清除缓存消息
-	clearArgs := ClearArgs{
-		OpReg: args.OpReg,
-	}
-	clearReply := ClearReply{}
+	// // 发送清除缓存消息
+	// clearArgs := ClearArgs{
+	// 	OpReg: args.OpReg,
+	// }
+	// clearReply := ClearReply{}
 
-	for !ck.server.Call("KVServer.Clear", &clearArgs, &clearReply) {
-	}
+	// for !ck.server.Call("KVServer.Clear", &clearArgs, &clearReply) {
+	// }
 
 	return reply.Value
 }

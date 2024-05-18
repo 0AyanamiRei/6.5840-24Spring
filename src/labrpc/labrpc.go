@@ -49,15 +49,63 @@ package labrpc
 //   pass svc to srv.AddService()
 //
 
-import "6.5840/labgob"
-import "bytes"
-import "reflect"
-import "sync"
-import "log"
-import "strings"
-import "math/rand"
-import "time"
-import "sync/atomic"
+//
+// 基于通道的RPC，用于6.5840实验室。
+//
+// 模拟一个可以丢失请求、丢失回复、延迟消息，并且可以完全断开特定主机的网络。
+//
+// 我们将使用原始的labrpc.go来测试你的代码以进行评分。
+// 所以，虽然你可以修改这个代码来帮助你调试，但请在提交之前对照原始代码进行测试。
+//
+// 从Go net/rpc/server.go改编。
+//
+// 发送labgob编码的值以确保RPC
+// 不包含对程序对象的引用。
+//
+// net := MakeNetwork() -- 持有网络，客户端，服务器。
+// end := net.MakeEnd(endname) -- 创建一个客户端端点，与一个服务器进行通信。
+// net.AddServer(servername, server) -- 向网络添加一个命名的服务器。
+// net.DeleteServer(servername) -- 删除指定的服务器。
+// net.Connect(endname, servername) -- 连接一个客户端到一个服务器。
+// net.Enable(endname, enabled) -- 启用/禁用一个客户端。
+// net.Reliable(bool) -- false表示丢弃/延迟消息
+//
+// end.Call("Raft.AppendEntries", &args, &reply) -- 发送一个RPC，等待回复。
+// "Raft"是要调用的服务器结构的名称。
+// "AppendEntries"是要调用的方法的名称。
+// Call()返回true表示服务器执行了请求
+// 并且回复是有效的。
+// 如果网络丢失了请求或回复
+// 或者服务器已关闭，Call()返回false。
+// 在同一个ClientEnd上同时进行多个Call()是可以的。
+// 并发的Call()可能会被服务器接收到的顺序打乱，
+// 因为网络可能会重新排序消息。
+// Call()保证会返回（可能会有延迟）*除非*服务器端的
+// 处理函数没有返回。
+// 服务器RPC处理函数必须声明其参数和回复参数
+// 为指针，以便它们的类型与Call()的参数类型完全匹配。
+//
+// srv := MakeServer()
+// srv.AddService(svc) -- 一个服务器可以有多个服务，例如 Raft 和 k/v
+//   将srv传递给net.AddServer()
+//
+// svc := MakeService(receiverObject) -- obj的方法将处理RPCs
+//   类似于Go的rpcs.Register()
+//   将svc传递给srv.AddService()
+//
+
+import (
+	"bytes"
+	"log"
+	"math/rand"
+	"reflect"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	"6.5840/labgob"
+)
 
 type reqMsg struct {
 	endname  interface{} // name of sending ClientEnd

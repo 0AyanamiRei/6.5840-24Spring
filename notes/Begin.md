@@ -4,14 +4,14 @@
 
 ```c
 LEC     paper6.824         paper6.5840
-1       MapReduce          MapReduce
-2       Go tutorial        Go tutorial
-3       GFS                None
-4       FTVM               Linearizability(NEW)
-5       TGMM               The Go..(NEW)
-6       Raft 1~5           GFS
-7       Raft 7~end         Raft 1~5
-8       ZooKeeper          Raft 7~end
+1       MapReduce          MapReduce-----------------------ok
+2       Go tutorial        Go tutorial   
+3       GFS-----------ok   None
+4       FTVM               Linearizability(NEW)------------ok
+5       TGMM               The Go..(NEW)-------------------pass
+6       Raft 1~5-----ok    GFS-----------------------------ok
+7       Raft 7~end---ok    Raft 1~5------------------------ok
+8       ZooKeeper          Raft 7~end----------------------ok
 9       CRAQ               ZooKeeper
 10      Aurora             None
 11      Frangipani         Grove(NEW)

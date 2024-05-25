@@ -1,0 +1,164 @@
+Test (3B): RPC byte count ...
+013650  [Vote(1)] p0(F)-1: Vote Start
+013655  [Vote(1)] p2(F)-1: Voted(1) p2->p0
+013655  [Vote(1)] p0(F)-1: Vote enough with 2votes
+013655  [Vote(1)] p1(F)-1: Voted(1) p1->p0
+013657  [Vote(1)] p0(L)-1: Vote enough with 3votes
+014015  [Start(1)] p0(L) append Log:{1 99}
+
+p0(L) term=1 log={(0,0) (1 99)} 
+p1(F) term=1 log={(0,0)}
+p2(F) term=1 log={(0,0)}
+
+014458  [Aped(1)] sent p0(L)->p0 Log:[{1 99}]
+014458  [Aped(1)] sent p0(L)->p1 Log:[{1 99}]
+014458  [Aped(1)] sent p0(L)->p2 Log:[{1 99}]
+014458  [Aped(1)] p2 append Log[1~2]: [{1 99}]
+
+p0(L) term=1 log={(0,0) (1 99)}  commit=
+p1(F) term=1 log={(0,0)}         commit=
+p2(F) term=1 log={(0,0) (1 99)}  commit=
+
+014458  [Applier] p0(L) apply log[1]: 99
+014464  [Aped(1)] p1 append Log[1~2]: [{1 99}]
+015467  [Aped(1)] sent p0(L)->p0 Log:[{1 99}]
+015467  [Aped(1) p2(F) commit log[0~min(1,1)]
+015467  [Aped(1) p1(F) commit log[0~min(1,1)]
+015472  [Applier] p1(F) apply log[1]: 99
+015478  [Applier] p2(F) apply log[1]: 99
+
+p0(L) term=1 log={(0,0) (1 99)}  commit=1
+p1(F) term=1 log={(0,0) (1 99)}  commit=1
+p2(F) term=1 log={(0,0) (1 99)}  commit=1
+
+
+
+015494  [Start(1)] p0(L) append Log:{1 CC}
+
+p0(L) term=1 log={(0,0) (1 99) (1 CC)}  commit=1
+p1(F) term=1 log={(0,0) (1 99)}         commit=1
+p2(F) term=1 log={(0,0) (1 99)}         commit=1
+
+
+016514  [Aped(1)] sent p0(L)->p0 Log:[{1 99} {1 CC}]
+016551  [Aped(1)] sent p0(L)->p1 Log:[{1 CC}]
+016551  [Aped(1)] sent p0(L)->p2 Log:[{1 CC}]
+016551  [Aped(1)] p2 append Log[2~3]: [{1 CC}]
+016561  [Aped(1)] p1 append Log[2~3]: [{1 CC}]
+016650  [Applier] p0(L) apply log[2]: CC
+017609  [Aped(1)] sent p0(L)->p0 Log:[{1 99} {1 CC}]
+017615  [Aped(1) p2(F) commit log[1~min(2,2)]
+017615  [Aped(1) p1(F) commit log[1~min(2,2)]
+017682  [Applier] p2(F) apply log[2]: CC
+017698  [Applier] p1(F) apply log[2]: CC
+
+p0(L) term=1 log={(0,0) (1 99) (1 CC)}         commit=1
+p1(F) term=1 log={(0,0) (1 99) (1 CC)}         commit=1
+p2(F) term=1 log={(0,0) (1 99) (1 CC)}         commit=1
+
+017923  [Start(1)] p0(L) append Log:{1 DD}
+018747  [Aped(1)] sent p0(L)->p0 Log:[{1 99} {1 CC} {1 DD}]
+018747  [Aped(1)] sent p0(L)->p1 Log:[{1 DD}]
+018747  [Aped(1)] sent p0(L)->p2 Log:[{1 DD}]
+018747  [Aped(1)] p2 append Log[3~4]: [{1 DD}]
+018747  [Applier] p0(L) apply log[3]: DD
+018747  [Aped(1)] p1 append Log[3~4]: [{1 DD}]
+019774  [Aped(1)] sent p0(L)->p0 Log:[{1 99} {1 CC} {1 DD}]
+019779  [Aped(1) p2(F) commit log[2~min(3,3)]
+019779  [Aped(1) p1(F) commit log[2~min(3,3)]
+019873  [Applier] p2(F) apply log[3]: DD
+019885  [Applier] p1(F) apply log[3]: DD
+020092  [Start(1)] p0(L) append Log:{1 EE}
+020829  [Aped(1)] sent p0(L)->p0 Log:[{1 99} {1 CC} {1 DD} {1 EE}]
+020829  [Aped(1)] sent p0(L)->p1 Log:[{1 EE}]
+020829  [Aped(1)] sent p0(L)->p2 Log:[{1 EE}]
+020829  [Aped(1)] p2 append Log[4~5]: [{1 EE}]
+020835  [Aped(1)] p1 append Log[4~5]: [{1 EE}]
+020851  [Applier] p0(L) apply log[4]: EE
+021839  [Aped(1)] sent p0(L)->p0 Log:[{1 99} {1 CC} {1 DD} {1 EE}]
+021839  [Aped(1) p1(F) commit log[3~min(4,4)]
+021839  [Aped(1) p2(F) commit log[3~min(4,4)]
+021939  [Applier] p1(F) apply log[4]: EE
+021939  [Applier] p2(F) apply log[4]: EE
+022073  [Start(1)] p0(L) append Log:{1 FF}
+022942  [Aped(1)] sent p0(L)->p0 Log:[{1 99} {1 CC} {1 DD} {1 EE} {1 FF}]
+022947  [Aped(1)] sent p0(L)->p1 Log:[{1 FF}]
+022947  [Aped(1)] sent p0(L)->p2 Log:[{1 FF}]
+022947  [Aped(1)] p2 append Log[5~6]: [{1 FF}]
+022947  [Applier] p0(L) apply log[5]: FF
+022953  [Aped(1)] p1 append Log[5~6]: [{1 FF}]
+024014  [Aped(1)] sent p0(L)->p0 Log:[{1 99} {1 CC} {1 DD} {1 EE} {1 FF}]
+024019  [Aped(1) p2(F) commit log[4~min(5,5)]
+024024  [Aped(1) p1(F) commit log[4~min(5,5)]
+024123  [Applier] p2(F) apply log[5]: FF
+024196  [Applier] p1(F) apply log[5]: FF
+024347  [Start(1)] p0(L) append Log:{1 GG}
+025050  [Aped(1)] sent p0(L)->p0 Log:[{1 99} {1 CC} {1 DD} {1 EE} {1 FF} {1 GG}]
+025060  [Aped(1)] sent p0(L)->p1 Log:[{1 GG}]
+025060  [Aped(1)] sent p0(L)->p2 Log:[{1 GG}]
+025065  [Aped(1)] p2 append Log[6~7]: [{1 GG}]
+025065  [Applier] p0(L) apply log[6]: GG
+025065  [Aped(1)] p1 append Log[6~7]: [{1 GG}]
+026145  [Aped(1)] sent p0(L)->p0 Log:[{1 99} {1 CC} {1 DD} {1 EE} {1 FF} {1 GG}]
+026151  [Aped(1) p2(F) commit log[5~min(6,6)]
+026151  [Applier] p2(F) apply log[6]: GG
+026151  [Aped(1) p1(F) commit log[5~min(6,6)]
+026317  [Applier] p1(F) apply log[6]: GG
+026395  [Start(1)] p0(L) append Log:{1 HH}
+027162  [Aped(1)] sent p0(L)->p0 Log:[{1 99} {1 CC} {1 DD} {1 EE} {1 FF} {1 GG} {1 HH}]
+027162  [Aped(1)] sent p0(L)->p1 Log:[{1 HH}]
+027162  [Aped(1)] sent p0(L)->p2 Log:[{1 HH}]
+027166  [Aped(1)] p2 append Log[7~8]: [{1 HH}]
+027166  [Aped(1)] p1 append Log[7~8]: [{1 HH}]
+027271  [Applier] p0(L) apply log[7]: HH
+028207  [Aped(1)] sent p0(L)->p0 Log:[{1 99} {1 CC} {1 DD} {1 EE} {1 FF} {1 GG} {1 HH}]
+028207  [Aped(1) p2(F) commit log[6~min(7,7)]
+028207  [Aped(1) p1(F) commit log[6~min(7,7)]
+028362  [Applier] p1(F) apply log[7]: HH
+028457  [Applier] p2(F) apply log[7]: HH
+028666  [Start(1)] p0(L) append Log:{1 JJ}
+029242  [Aped(1)] sent p0(L)->p0 Log:[{1 99} {1 CC} {1 DD} {1 EE} {1 FF} {1 GG} {1 HH} {1 JJ}]
+029246  [Aped(1)] sent p0(L)->p1 Log:[{1 JJ}]
+029246  [Aped(1)] sent p0(L)->p2 Log:[{1 JJ}]
+029246  [Aped(1)] p2 append Log[8~9]: [{1 JJ}]
+029252  [Aped(1)] p1 append Log[8~9]: [{1 JJ}]
+029298  [Applier] p0(L) apply log[8]: JJ
+030817  [Aped(1)] sent p0(L)->p0 Log:[{1 99} {1 CC} {1 DD} {1 EE} {1 FF} {1 GG} {1 HH} {1 JJ}]
+030822  [Aped(1) p2(F) commit log[7~min(8,8)]
+030822  [Aped(1) p1(F) commit log[7~min(8,8)]
+030906  [Applier] p2(F) apply log[8]: JJ
+030916  [Applier] p1(F) apply log[8]: JJ
+031058  [Start(1)] p0(L) append Log:{1 BB}
+031831  [Aped(1)] sent p0(L)->p0 Log:[{1 99} {1 CC} {1 DD} {1 EE} {1 FF} {1 GG} {1 HH} {1 JJ} {1 BB}]
+031836  [Aped(1)] sent p0(L)->p1 Log:[{1 BB}]
+031844  [Aped(1)] sent p0(L)->p2 Log:[{1 BB}]
+031844  [Aped(1)] p1 append Log[9~10]: [{1 BB}]
+031850  [Aped(1)] p2 append Log[9~10]: [{1 BB}]
+032186  [Applier] p0(L) apply log[9]: BB
+032909  [Aped(1)] sent p0(L)->p0 Log:[{1 99} {1 CC} {1 DD} {1 EE} {1 FF} {1 GG} {1 HH} {1 JJ} {1 BB}]
+032919  [Aped(1) p2(F) commit log[8~min(9,9)]
+032927  [Aped(1) p1(F) commit log[8~min(9,9)]
+033102  [Applier] p1(F) apply log[9]: BB
+033102  [Applier] p2(F) apply log[9]: BB
+
+
+033160  [Start(1)] p0(L) append Log:{1 AA}
+
+// 这里莫名其妙就开启投票了
+037305  [Vote(2)] p2(F)-2: Vote Start
+037305  [Vote(2)] p1(F)-2: Vote Start
+037603  [Aped(1)] sent p0(L)->p1 Log:[{1 AA}]
+037603  [Aped(1)] sent p0(L)->p2 Log:[{1 AA}]
+
+037747  [Vote(2)] p0(F)-2: Refuse, had vote(1) p0->p0
+037791  [out of data] p2's term=2, leader p0 is 1
+038092  [Vote(2)] p0(F)-2: Refuse, had vote(1) p0->p0
+038092  [out of data] p1's term=2, leader p0 is 1
+041581  [Vote(3)] p2(F)-3: Vote Start
+041581  [Vote(3)] p1(F)-3: Voted(3) p1->p2
+041581  [Vote(3)] p2(F)-3: Vote enough with 2votes
+041581  [Vote(3)] p0(F)-3: Refuse, had vote(1) p0->p0
+
+
+--- FAIL: TestRPCBytes3B (4.29s)
+    config.go:598: one(AA) failed to reach agreement

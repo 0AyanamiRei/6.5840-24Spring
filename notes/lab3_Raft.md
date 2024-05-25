@@ -418,19 +418,43 @@ func (rf *Raft) AppendEntries(args, reply){
 但是我还是想知道, 因为心跳消息会附带日志, 是否不必等待某一条rpc?
 
 
-## 锁策略
+## Raft Locking Advice
 
-现在使用了两把锁, 每个`Raft`自带的大锁`rf.mu`和函数`sendHeartbeat()`,`sendRequestVote()`中定义的锁`HeartMu`和`VoteMu`, 我们来看看每个函数涉及到哪些变量的修改:
+- Rule1 : 最好是修补`-race`运行后给出的数据竞争条件
+- Rule2 : 对于共享数据进行修改时, 而其他程序可能中途查看数据, 则应该在这期间使用锁
+- Rule3 : 在等待的时候要释放锁资源, 比如发送RPC并等待回复和调用`time.Sleep()`时
 
-**Heartbeat()** 中, `CurrentTerm`,`LastHearbeats`,`State`, 以及可能的`me(debug)`;
+```go
+Example:
+  rf.mu.Lock()
+  rf.currentTerm += 1
+  rf.state = Candidate
+  rf.mu.Unlock()
+```
 
-**RequestVote()** 中, `CurrentTerm`, `LastApplied`, `Log`, `VotedTerm`, `VotedFor`, 以及可能的`me(debug)`;
+像上面的这段数据`currentTerm`和`state`, 其他地方访问这些数据的时候也应该要请求锁`rf.mu`
 
-**sendHeartbeat()** 中, `CurrentTerm`, `me`, `LastHearbeats`, `State`
+- Rule4 : 要小心在释放锁和重新获取锁之间的假设, 比如下面这个例子(实际上我实现的时候也遇到了)
 
-**sendRequestVote()** 中, `CurrentTerm`, `VotedFor`, `VotedTerm`, `LastLogTerm`, `LastApplied`, `me`, `Log`, `State`
+```go
+  rf.mu.Lock()
+  rf.currentTerm += 1
+  rf.state = Candidate
+  for <each peer> {
+    go func() {
+      rf.mu.Lock()
+      args.Term = rf.currentTerm
+      rf.mu.Unlock()
+      Call("Raft.RequestVote", &args, ...)
+      // handle the reply...
+    } ()
+  }
+  rf.mu.Unlock()
+```
 
-思考一下选举的过程, 正确情况下, 调用`sendRequestVote()`和`sendHeartbeat()`的时候, 我们不会一直持有服务器大锁, 因为这些函数只是简单的读取状态, 创建一个`args`, 然后为其他服务器开一个线程共享这个`args`, 就退出了, 很快就让出了`Raft`的锁然后进入睡眠, 为了保护这期间的多个线程, 我们是在函数体内部创建了一个小锁`mu`, 给这些线程使用. (这里我想到了一个问题, 比如我第一次发心跳消息时, 由于网络延迟等问题导致某个线程一直在重发rpc, 然后第二轮心跳消息到来, 虽然对于心跳消息来说, 不必重发....吧?)
+在这个例子中, 不同线程之间读到的`currentTerm`可能会不一致, 所以我们可以提前在持有锁的时候复制它, 然后在每个线程中使用该复制的资源
+
+
 
 ## TAs' advice
 

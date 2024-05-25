@@ -43,10 +43,10 @@ const (
 	FOLLOWER  int = 0
 
 	// DEBUG
-	DEBUG           bool = true
-	DEBUG_Vote      bool = true
+	DEBUG           bool = false
+	DEBUG_Vote      bool = false
 	DEBUG_Heartbeat bool = false
-	DEBUG_Aped      bool = true
+	DEBUG_Aped      bool = false
 	DEBUG_VoteRpc   bool = false
 	DEBUG_HeartRpc  bool = false
 	DEBUG_ApedRpc   bool = false
@@ -612,7 +612,7 @@ func (rf *Raft) killed() bool {
 // 选举线程
 func (rf *Raft) ticker() {
 	for !rf.killed() {
-		ms := 400 + (rand.Int63() % 150)
+		ms := 350 + (rand.Int63() % 200)
 		time.Sleep(time.Duration(ms) * time.Millisecond)
 
 		rf.mu.Lock()
@@ -707,7 +707,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.readPersist(persister.ReadRaftState())
 
 	// 心跳线程
-	go rf.heartbeat(50)
+	go rf.heartbeat(125)
 	// 选举线程
 	go rf.ticker()
 	// apply线程

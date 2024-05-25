@@ -143,8 +143,14 @@ p2(F) term=1 log={(0,0) (1 99) (1 CC)}         commit=1
 
 
 033160  [Start(1)] p0(L) append Log:{1 AA}
-
-// 这里莫名其妙就开启投票了
+.
+.
+.
+中间间隔了很久
+.
+.
+.
+开启投票了
 037305  [Vote(2)] p2(F)-2: Vote Start
 037305  [Vote(2)] p1(F)-2: Vote Start
 037603  [Aped(1)] sent p0(L)->p1 Log:[{1 AA}]
@@ -159,6 +165,8 @@ p2(F) term=1 log={(0,0) (1 99) (1 CC)}         commit=1
 041581  [Vote(3)] p2(F)-3: Vote enough with 2votes
 041581  [Vote(3)] p0(F)-3: Refuse, had vote(1) p0->p0
 
-
 --- FAIL: TestRPCBytes3B (4.29s)
     config.go:598: one(AA) failed to reach agreement
+
+我觉得问题是测试的脚本并行数开的太高了, 我出现这个错误日志都是在开了50的并行数(后台还挂着碧蓝航线和脚本2333), 冲浪了一下别人的
+心得, 开了10的并行数(听说是开成CPU核心数x2, 不过这样有点慢)

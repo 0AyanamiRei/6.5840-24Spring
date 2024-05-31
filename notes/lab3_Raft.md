@@ -503,4 +503,8 @@ If an existing entry conflicts with a new one (same index but different terms), 
 
 ***term confusion***
 
-## 
+## lab3c 持久化
+
+1. **currentTerm**
+
+改变服务器当前任期的场景: `发起选举时候: sendRequestVote()`, `任意rpc收到回复发现自己任期过期时`, `收到消息更新自己的任期时`

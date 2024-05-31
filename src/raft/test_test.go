@@ -806,6 +806,9 @@ func TestPersist33C(t *testing.T) {
 // haven't been committed yet.
 func TestFigure83C(t *testing.T) {
 	servers := 5
+	//debug 0:disconnect, 1: connected, -1:crash
+	serverState := []int{1, 1, 1, 1, 1}
+	//
 	cfg := make_config(t, servers, false, false)
 	defer cfg.cleanup()
 
@@ -815,6 +818,9 @@ func TestFigure83C(t *testing.T) {
 
 	nup := servers
 	for iters := 0; iters < 1000; iters++ {
+		if DEBUG {
+			DPrintf("[DEBUG]: %v\n", serverState)
+		}
 		leader := -1
 		for i := 0; i < servers; i++ {
 			if cfg.rafts[i] != nil {
@@ -835,6 +841,8 @@ func TestFigure83C(t *testing.T) {
 
 		if leader != -1 {
 			cfg.crash1(leader)
+			//debug
+			serverState[leader] = -1
 			nup -= 1
 		}
 
@@ -843,6 +851,8 @@ func TestFigure83C(t *testing.T) {
 			if cfg.rafts[s] == nil {
 				cfg.start1(s, cfg.applier)
 				cfg.connect(s)
+				//debug
+				serverState[s] = 1
 				nup += 1
 			}
 		}
@@ -852,9 +862,14 @@ func TestFigure83C(t *testing.T) {
 		if cfg.rafts[i] == nil {
 			cfg.start1(i, cfg.applier)
 			cfg.connect(i)
+			//debug
+			serverState[i] = 1
 		}
 	}
 
+	if DEBUG {
+		DPrintf("[DEBUG]: %v\n", serverState)
+	}
 	cfg.one(rand.Int(), servers, true)
 
 	cfg.end()

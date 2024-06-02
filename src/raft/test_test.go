@@ -954,7 +954,9 @@ func TestFigure8Unreliable3C(t *testing.T) {
 		}
 	}
 
-	cfg.one(rand.Int()%10000, servers, true)
+	tmp := rand.Int() % 10000
+	fmt.Println("cgf.one():", tmp)
+	cfg.one(tmp, servers, true)
 
 	cfg.end()
 }

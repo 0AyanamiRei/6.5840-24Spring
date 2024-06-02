@@ -1,0 +1,587 @@
+[Info] p4(F,69) "CMIT(141) APLY(141) LogLen=638 log[last]={62 4243}
+[Info] p3(F,69) "CMIT(141) APLY(141) LogLen=470 log[last]={68 7812}
+[Info] p2(L,64) "CMIT(141) APLY(141) LogLen=540 log[last]={64 4972}
+[Info] p0(L,68) "CMIT(469) APLY(469) LogLen=486 log[last]={68 8238}
+[Info] p1(F,69) "CMIT(141) APLY(141) LogLen=470 log[last]={68 7812}
+后续p2追加了一些日志, 不过任期不改变, 这里是我没有处理的情况, 所以重连上来的那个时刻有概率把请求
+发送给过时的领导人, 暂时还没来得及退位, 这里最应该当选领导人的是p0
+
+cgf.one(): 8727
+915992  [Start] p2(L,64) "Add Log:{64 8727}"
+916673  [APED] p2(L,64)->p0 "Aped Log[415~546]"
+916673  [APED] p2(L,64)->p1 "Aped Log[136~546]"
+916673  [APED] p0(L,68)->p1 "Aped Log[470~491]"
+916673  [APED] p0(L,68)->p2 "Aped Log[469~491]"
+916673  [APED] p2(L,64)->p3 "Aped Log[142~546]"
+916673  [APED] p0(L,68)->p3 "Aped Log[161~491]"
+916673  [APED] p0(L,68)->p4 "Aped Log[469~491]"
+916673  [APED] p2(L,64)->p4 "Aped Log[415~546]"
+
+917227  [VOTE-70] p3(F,70): Vote Start
+921594  [VOTE-71] p3(F,71): Vote Start
+
+918089  [Info] p4(F,70) "CMIT(141) APLY(141) LogLen=638 log[last]={62 4243} NextIndex:[563 2 563 162 563] MatchIndex:[-1 -1 -1 -1 -1]"
+918192  [Info] p0(F,70) "CMIT(469) APLY(469) LogLen=492 log[last]={68 9838} NextIndex:[469 470 469 161 469] MatchIndex:[-1 469 -1 469 -1]"
+918192  [Info] p2(F,69) "CMIT(141) APLY(141) LogLen=547 log[last]={64 8727} NextIndex:[415 136 415 142 415] MatchIndex:[-1 -1 -1 -1 -1]"
+918192  [Info] p3(F,70) "CMIT(141) APLY(141) LogLen=470 log[last]={68 7812} NextIndex:[2 86 86 86 86] MatchIndex:[-1 -1 -1 -1 -1]"
+918192  [Info] p1(F,70) "CMIT(141) APLY(141) LogLen=470 log[last]={68 7812} NextIndex:[2 2 2 2 2] MatchIndex:[1 -1 -1 1 1]"
+
+921777  [VOTE-71] p0(F,71): Vote Start
+
+921777  [VOTE-71] p0(F,71)->p4 "Ask Vote"
+921777  [VOTE-71] p0(F,71)->p1 "Ask Vote"
+921777  [VOTE-71] p0(F,71)->p3 "Ask Vote"
+921777  [VOTE-71] p0(F,71)->p2 "Ask Vote"
+
+921866  [Info] p4(F,71) "CMIT(141) APLY(141) LogLen=638 log[last]={62 4243} NextIndex:[563 2 563 162 563] MatchIndex:[-1 -1 -1 -1 -1]"
+921951  [Info] p3(F,71) "CMIT(141) APLY(141) LogLen=470 log[last]={68 7812} NextIndex:[2 86 86 86 86] MatchIndex:[-1 -1 -1 -1 -1]"
+921951  [Info] p2(F,69) "CMIT(141) APLY(141) LogLen=547 log[last]={64 8727} NextIndex:[415 136 415 142 415] MatchIndex:[-1 -1 -1 -1 -1]"
+921951  [Info] p0(F,71) "CMIT(469) APLY(469) LogLen=492 log[last]={68 9838} NextIndex:[469 470 469 161 469] MatchIndex:[-1 469 -1 469 -1]"
+921951  [Info] p1(F,71) "CMIT(141) APLY(141) LogLen=470 log[last]={68 7812} NextIndex:[2 2 2 2 2] MatchIndex:[1 -1 -1 1 1]"
+就这里的情况来看, p0任期是最新的, 最后一个日志:
+
+p0(71) log[491]=68
+p1(71) log[469]=68  √
+p2(69) log[546]=64  √
+p3(71) log[469]=68  √
+p4(71) log[637]=68  
+
+毫无疑问p0会获得 p1 p2 p3的票
+
+实际上:
+p0自己给自己投了一票, 这里只有两票, p3拒绝的理由:
+
+//2: 已投票
+if rf.VotedFor != -1 && rf.VotedFor != args.CandidateId {
+    reason += 1 << 2 (4)
+}
+
+即p3已在本轮投过票了, 这里我想到了一点, 可不可以不仅记录投票的服务器, 同时把该服务器请求投票
+发送的preLogIndex, preLogTerm, term都记录下来, 如果在一轮中, 收到多个候选人的时候投给这些信息更
+新的一方, 思考一下这会不会打破一轮任期只有一个领导人的原则:
+
+如果一个比较旧的候选人先行得到了大多数得票, 然后发送了一轮心跳通知, 现有的设计中, 一致性检查都是为了让其他服务器强行
+和领导人保持一致设计的, 我的期望是通过这轮心跳, 然后这个暂时的领导人得知自己的日志比较旧就会退位, 同时因为本轮投票中
+这些服务器改票给了另一个比较新的服务器, 于是那个服务器就会成为领导人
+
+921963  [VOTE-71] p3(F,71)->p0 "Refuse Vote:(4)"
+921963  [VOTE-71] p4(F,71)->p0 "Refuse Vote:(4)"
+921995  [VOTE-71] p2(F,71)->p0 "OKKKK"
+p1的投票消息因为网络问题丢掉了
+
+
+925115  [VOTE-72] p3(F,72): Vote Start
+925115  [VOTE-72] p3(F,72)->p4 "Ask Vote"
+925115  [VOTE-72] p3(F,72)->p1 "Ask Vote"
+925115  [VOTE-72] p3(F,72)->p0 "Ask Vote"
+925115  [VOTE-72] p3(F,72)->p2 "Ask Vote"
+925174  [VOTE-72] p4(F,72)->p3 "OKKKK"
+925195  [VOTE-72] p0(F,72)->p3 "Refuse Vote:(8)"
+925226  [VOTE-72] p2(F,72)->p3 "OKKKK"
+925281  [VOTE-72] p1(F,72)->p3 "OKKKK"
+925634  [Info] p4(F,72) "CMIT(141) APLY(141) LogLen=638 log[last]={62 4243} NextIndex:[563 2 563 162 563] MatchIndex:[-1 -1 -1 -1 -1]"
+925739  [Info] p3(F,72) "CMIT(141) APLY(141) LogLen=470 log[last]={68 7812} NextIndex:[2 86 86 86 86] MatchIndex:[-1 -1 -1 -1 -1]"
+925739  [Info] p0(F,72) "CMIT(469) APLY(469) LogLen=492 log[last]={68 9838} NextIndex:[469 470 469 161 469] MatchIndex:[-1 469 -1 469 -1]"
+925739  [Info] p2(F,72) "CMIT(141) APLY(141) LogLen=547 log[last]={64 8727} NextIndex:[415 136 415 142 415] MatchIndex:[-1 -1 -1 -1 -1]"
+925739  [Info] p1(F,72) "CMIT(141) APLY(141) LogLen=470 log[last]={68 7812} NextIndex:[2 2 2 2 2] MatchIndex:[1 -1 -1 1 1]"
+925818  [VOTE-73] p0(F,73): Vote Start
+925818  [VOTE-73] p0(F,73)->p4 "Ask Vote"
+925818  [VOTE-73] p0(F,73)->p2 "Ask Vote"
+925818  [VOTE-73] p0(F,73)->p3 "Ask Vote"
+925818  [VOTE-73] p0(F,73)->p1 "Ask Vote"
+925898  [VOTE-73] p2(F,73)->p0 "OKKKK"
+925951  [VOTE-73] p3(F,73)->p0 "OKKKK"
+925984  [VOTE-73] p4(F,73)->p0 "OKKKK"
+929459  [Info] p4(F,73) "CMIT(141) APLY(141) LogLen=638 log[last]={62 4243} NextIndex:[563 2 563 162 563] MatchIndex:[-1 -1 -1 -1 -1]"
+929513  [Info] p0(F,73) "CMIT(469) APLY(469) LogLen=492 log[last]={68 9838} NextIndex:[469 470 469 161 469] MatchIndex:[-1 469 -1 469 -1]"
+929513  [Info] p1(F,72) "CMIT(141) APLY(141) LogLen=470 log[last]={68 7812} NextIndex:[2 2 2 2 2] MatchIndex:[1 -1 -1 1 1]"
+929513  [Info] p2(F,73) "CMIT(141) APLY(141) LogLen=547 log[last]={64 8727} NextIndex:[415 136 415 142 415] MatchIndex:[-1 -1 -1 -1 -1]"
+929513  [Info] p3(F,73) "CMIT(141) APLY(141) LogLen=470 log[last]={68 7812} NextIndex:[2 86 86 86 86] MatchIndex:[-1 -1 -1 -1 -1]"
+930164  [VOTE-74] p0(F,74): Vote Start
+930164  [VOTE-74] p0(F,74)->p4 "Ask Vote"
+930164  [VOTE-74] p0(F,74)->p2 "Ask Vote"
+930164  [VOTE-74] p0(F,74)->p3 "Ask Vote"
+930164  [VOTE-74] p0(F,74)->p1 "Ask Vote"
+930207  [VOTE-74] p3(F,74)->p0 "OKKKK"
+930230  [VOTE-74] p1(F,74)->p0 "OKKKK"
+930300  [VOTE-74] p4(F,74)->p0 "OKKKK"
+930393  [VOTE-74] p2(F,74)->p0 "OKKKK"
+933245  [Info] p4(F,74) "CMIT(141) APLY(141) LogLen=638 log[last]={62 4243} NextIndex:[563 2 563 162 563] MatchIndex:[-1 -1 -1 -1 -1]"
+933310  [Info] p1(F,74) "CMIT(141) APLY(141) LogLen=470 log[last]={68 7812} NextIndex:[2 2 2 2 2] MatchIndex:[1 -1 -1 1 1]"
+933310  [Info] p0(F,74) "CMIT(469) APLY(469) LogLen=492 log[last]={68 9838} NextIndex:[469 470 469 161 469] MatchIndex:[-1 469 -1 469 -1]"
+933310  [Info] p2(F,74) "CMIT(141) APLY(141) LogLen=547 log[last]={64 8727} NextIndex:[415 136 415 142 415] MatchIndex:[-1 -1 -1 -1 -1]"
+933310  [Info] p3(F,74) "CMIT(141) APLY(141) LogLen=470 log[last]={68 7812} NextIndex:[2 86 86 86 86] MatchIndex:[-1 -1 -1 -1 -1]"
+934560  [VOTE-74] p0(F,74): Got 3 votes
+934560  [Info] p0(L,74) "CMIT(469) APLY(469) LogLen=492, log[last]={68 9838} NextIndex:[492 492 492 492 492] MatchIndex:[-1 -1 -1 -1 -1]"
+935578  [APED] p0(L,74)->p4 "Aped Log[491~491]"
+
+
+
+
+// 实际上这里p0仍然获得了领导人的身份
+936035  [Start] p0(L,74) "Add Log:{74 8727}"
+
+936330  [APED] p0(L,74)->p1 "Aped Log[492~492]"
+936330  [APED] p0(L,74)->p2 "Aped Log[492~492]"
+936330  [APED] p0(L,74)->p3 "Aped Log[492~492]"
+936330  [APED] p0(L,74)->p4 "Aped Log[491~492]"
+
+937024  [Info] p4(F,74) "CMIT(141) APLY(141) LogLen=490 log[last]={35 2202}"
+937088  [Info] p2(F,74) "CMIT(141) APLY(141) LogLen=491 log[last]={64 7795}"
+937088  [Info] p0(L,74) "CMIT(469) APLY(469) LogLen=493 log[last]={74 8727}"
+937088  [Info] p3(F,74) "CMIT(141) APLY(141) LogLen=470 log[last]={68 7812}"
+937088  [Info] p1(F,74) "CMIT(141) APLY(141) LogLen=470 log[last]={68 7812}"
+
+937088  [APED] p0(L,74)->p1 "Aped Log[492~492]"
+937088  [APED] p0(L,74)->p2 "Aped Log[492~492]"
+937088  [APED] p0(L,74)->p3 "Aped Log[492~492]"
+937088  [APED] p0(L,74)->p4 "Aped Log[491~492]"
+
+937282  [Info] p0(L,74) "CMIT(469) APLY(469) LogLen=493, log[last]={74 8727}"
+
+938605  [APED] p0(L,74)->p1 "Aped Log[470~492]"
+938605  [APED] p0(L,74)->p4 "Aped Log[490~492]"
+
+938812  [APED] p1(F,74) "CMIT(141) APLY(141) Add Log[470~493] log[last]:{74 8727}"
+
+
+// p1日志追上了p0 开始应用
+938812  [CMIT] p1(F,74) "CMIT(141->469)"
+938812  [APLY] p1(F,74) "CMIT(469) APLY(141+1) apply {23 5666}"
+.
+.
+.
+938839  [APLY] p1(F,74) "CMIT(469) APLY(468+1) apply {68 7812}"
+
+
+
+939362  [APED] p0(L,74)->p1 "Aped Log[470~492]"
+939362  [APED] p0(L,74)->p2 "Aped Log[491~492]"
+939362  [APED] p0(L,74)->p3 "Aped Log[470~492]"
+939362  [APED] p0(L,74)->p4 "Aped Log[256~492]"
+939409  [APED] p1(F,74) "CMIT(469) APLY(469) Add Log[470~493] log[last]:{74 8727}"
+939534  [APED] p3(F,74) "CMIT(141) APLY(141) Add Log[470~493] log[last]:{74 8727}"
+
+
+// p3日志追上了p0 开始应用
+939534  [CMIT] p3(F,74) "CMIT(141->469)"
+939534  [APLY] p3(F,74) "CMIT(469) APLY(141+1) apply {23 5666}"
+.
+.
+.
+939561  [APLY] p3(F,74) "CMIT(469) APLY(468+1) apply {68 7812}"
+
+
+940117  [APED] p0(L,74)->p1 "Aped Log[470~492]"
+940117  [APED] p0(L,74)->p2 "Aped Log[491~492]"
+940117  [APED] p0(L,74)->p3 "Aped Log[470~492]"
+940117  [APED] p0(L,74)->p4 "Aped Log[256~492]"
+940273  [APED] p3(F,74) "CMIT(469) APLY(469) Add Log[470~493] log[last]:{74 8727}"
+
+
+940797  [Info] p4(F,74) "CMIT(141) APLY(141) LogLen=255 log[last]={24 9213} NextIndex:[563 2 563 162 563] MatchIndex:[-1 -1 -1 -1 -1]"
+940873  [Info] p0(L,74) "CMIT(469) APLY(469) LogLen=493 log[last]={74 8727} NextIndex:[493 493 493 493 493] MatchIndex:[-1 -1 -1 492 -1]"
+940873  [Info] p3(F,74) "CMIT(469) APLY(469) LogLen=493 log[last]={74 8727} NextIndex:[2 86 86 86 86] MatchIndex:[-1 -1 -1 -1 -1]"
+940873  [Info] p1(F,74) "CMIT(469) APLY(469) LogLen=493 log[last]={74 8727} NextIndex:[2 2 2 2 2] MatchIndex:[1 -1 -1 1 1]"
+940873  [Info] p2(F,74) "CMIT(141) APLY(141) LogLen=490 log[last]={64 1117} NextIndex:[415 136 415 142 415] MatchIndex:[-1 -1 -1 -1 -1]"
+
+
+941626  [APED] p0(L,74)->p2 "Aped Log[491~492]"
+941626  [APED] p0(L,74)->p4 "Aped Log[255~492]"
+942387  [APED] p0(L,74)->p2 "Aped Log[490~492]"
+942387  [APED] p0(L,74)->p3 "Aped Log[470~492]"
+942387  [APED] p0(L,74)->p4 "Aped Log[490~492]"
+942410  [APED] p3(F,74) "CMIT(469) APLY(469) Add Log[470~493] log[last]:{74 8727}"
+943156  [APED] p0(L,74)->p2 "Aped Log[491~492]"
+943156  [APED] p0(L,74)->p3 "Aped Log[470~492]"
+943156  [APED] p0(L,74)->p4 "Aped Log[490~492]"
+943315  [APED] p3(F,74) "CMIT(469) APLY(469) Add Log[470~493] log[last]:{74 8727}"
+943315  [CMIT] p0(L,74) CMIT(469->492)
+
+
+// 这里领导人p0应用了8727 那为什么会说one(8727) failed to reach agreement???
+943315  [APLY] p0(L,74) "CMIT(492) APLY(469+1) apply {68 8143}"
+...
+943315  [APLY] p0(L,74) "CMIT(492) APLY(491+1) apply {74 8727}"
+
+
+
+943907  [APED] p0(L,74)->p2 "Aped Log[491~492]"
+943907  [APED] p0(L,74)->p4 "Aped Log[163~492]"
+
+
+943968  [CMIT] p3(F,74) "CMIT(469->492)"
+943968  [APLY] p3(F,74) "CMIT(492) APLY(469+1) apply {68 8143}"
+....
+944122  [APLY] p1(F,74) "CMIT(492) APLY(491+1) apply {74 8727}"
+
+
+944659  [APED] p0(L,74)->p2 "Aped Log[491~492]"
+945423  [APED] p0(L,74)->p2 "Aped Log[491~492]"
+946174  [APED] p0(L,74)->p2 "Aped Log[491~492]"
+946931  [APED] p0(L,74)->p2 "Aped Log[491~492]"
+947692  [APED] p0(L,74)->p2 "Aped Log[491~492]"
+948442  [APED] p0(L,74)->p2 "Aped Log[491~492]"
+949197  [APED] p0(L,74)->p2 "Aped Log[491~492]"
+949949  [APED] p0(L,74)->p2 "Aped Log[491~492]"
+950701  [APED] p0(L,74)->p2 "Aped Log[490~492]"
+951459  [APED] p0(L,74)->p2 "Aped Log[490~492]"
+952209  [APED] p0(L,74)->p2 "Aped Log[490~492]"
+952965  [APED] p0(L,74)->p2 "Aped Log[490~492]"
+
+
+953723  [APED] p0(L,74)->p2 "Aped Log[415~492]"
+955234  [APED] p0(L,74)->p2 "Aped Log[414~492]"
+955993  [APED] p0(L,74)->p2 "Aped Log[414~492]"
+
+可以看到这里太慢了
+
+
+// 查看结果, 这里只有p2没有应用{74 8727}这条消息
+955934  [Info] p4(F,74) "CMIT(492) APLY(492) LogLen=493 log[last]={74 8727}"
+955993  [Info] p0(L,74) "CMIT(492) APLY(492) LogLen=493 log[last]={74 8727}"
+955993  [Info] p1(F,74) "CMIT(492) APLY(492) LogLen=493 log[last]={74 8727}"
+956034  [Info] p3(F,74) "CMIT(492) APLY(492) LogLen=493 log[last]={74 8727}"
+956034  [Info] p2(F,74) "CMIT(141) APLY(141) LogLen=413 log[last]={48 2690}"
+
+
+
+
+//failed to reach agreement
+//这里必须要每个服务器都应用了才算检查通过
+956161  [Start] p0(L,74) "Add Log:{74 8727}"
+956758  [APED] p0(L,74)->p1 "Aped Log[493~493]"
+956758  [APED] p0(L,74)->p2 "Aped Log[414~493]"
+956758  [APED] p0(L,74)->p3 "Aped Log[493~493]"
+956758  [APED] p0(L,74)->p4 "Aped Log[493~493]"
+956904  [APED] p3(F,74) "CMIT(492) APLY(492) Add Log[493~494] log[last]:{74 8727}"
+956937  [APED] p4(F,74) "CMIT(492) APLY(492) Add Log[493~494] log[last]:{74 8727}"
+957027  [APED] p1(F,74) "CMIT(492) APLY(492) Add Log[493~494] log[last]:{74 8727}"
+957510  [APED] p0(L,74)->p1 "Aped Log[493~493]"
+957510  [APED] p0(L,74)->p2 "Aped Log[490~493]"
+957510  [APED] p0(L,74)->p3 "Aped Log[493~493]"
+957510  [APED] p0(L,74)->p4 "Aped Log[493~493]"
+957573  [APED] p4(F,74) "CMIT(492) APLY(492) Add Log[493~494] log[last]:{74 8727}"
+957724  [APED] p1(F,74) "CMIT(492) APLY(492) Add Log[493~494] log[last]:{74 8727}"
+958270  [APED] p0(L,74)->p2 "Aped Log[490~493]"
+958270  [APED] p0(L,74)->p3 "Aped Log[493~493]"
+958270  [APED] p0(L,74)->p4 "Aped Log[493~493]"
+958350  [APED] p4(F,74) "CMIT(492) APLY(492) Add Log[493~494] log[last]:{74 8727}"
+958489  [APED] p3(F,74) "CMIT(492) APLY(492) Add Log[493~494] log[last]:{74 8727}"
+959020  [APED] p0(L,74)->p2 "Aped Log[413~493]"
+959020  [APED] p0(L,74)->p3 "Aped Log[493~493]"
+959020  [APED] p0(L,74)->p4 "Aped Log[493~493]"
+959095  [APED] p4(F,74) "CMIT(492) APLY(492) Add Log[493~494] log[last]:{74 8727}"
+959095  [CMIT] p0(L,74) CMIT(492->493)
+959095  [APLY] p0(L,74) "CMIT(493) APLY(492+1) apply {74 8727}"
+959192  [APED] p3(F,74) "CMIT(492) APLY(492) Add Log[493~494] log[last]:{74 8727}"
+959719  [Info] p4(F,74) "CMIT(492) APLY(492) LogLen=494 log[last]={74 8727} NextIndex:[563 2 563 162 563] MatchIndex:[-1 -1 -1 -1 -1]"
+959772  [Info] p0(L,74) "CMIT(493) APLY(493) LogLen=494 log[last]={74 8727} NextIndex:[493 493 413 494 494] MatchIndex:[-1 492 -1 493 493]"
+959773  [APED] p0(L,74)->p1 "Aped Log[493~493]"
+959772  [Info] p1(F,74) "CMIT(492) APLY(492) LogLen=494 log[last]={74 8727} NextIndex:[2 2 2 2 2] MatchIndex:[1 -1 -1 1 1]"
+959773  [APED] p0(L,74)->p2 "Aped Log[413~493]"
+959826  [Info] p3(F,74) "CMIT(492) APLY(492) LogLen=494 log[last]={74 8727} NextIndex:[2 86 86 86 86] MatchIndex:[-1 -1 -1 -1 -1]"
+959826  [Info] p2(F,74) "CMIT(141) APLY(141) LogLen=412 log[last]={48 5539} NextIndex:[415 136 415 142 415] MatchIndex:[-1 -1 -1 -1 -1]"
+959837  [APED] p1(F,74) "CMIT(492) APLY(492) Add Log[493~494] log[last]:{74 8727}"
+959837  [CMIT] p1(F,74) "CMIT(492->493)"
+959837  [APLY] p1(F,74) "CMIT(493) APLY(492+1) apply {74 8727}"
+960533  [APED] p0(L,74)->p1 "Aped Log[493~493]"
+960533  [APED] p0(L,74)->p2 "Aped Log[489~493]"
+960598  [CMIT] p3(F,74) "CMIT(492->493)"
+960598  [APLY] p3(F,74) "CMIT(493) APLY(492+1) apply {74 8727}"
+960670  [APED] p1(F,74) "CMIT(493) APLY(493) Add Log[493~494] log[last]:{74 8727}"
+961284  [APED] p0(L,74)->p1 "Aped Log[493~493]"
+961284  [APED] p0(L,74)->p2 "Aped Log[490~493]"
+961453  [CMIT] p4(F,74) "CMIT(492->493)"
+961453  [APLY] p4(F,74) "CMIT(493) APLY(492+1) apply {74 8727}"
+961513  [APED] p1(F,74) "CMIT(493) APLY(493) Add Log[493~494] log[last]:{74 8727}"
+962043  [APED] p0(L,74)->p1 "Aped Log[493~493]"
+962043  [APED] p0(L,74)->p2 "Aped Log[413~493]"
+962043  [APED] p0(L,74)->p4 "Aped Log[493~493]"
+962094  [APED] p1(F,74) "CMIT(493) APLY(493) Add Log[493~494] log[last]:{74 8727}"
+962225  [APED] p4(F,74) "CMIT(493) APLY(493) Add Log[493~494] log[last]:{74 8727}"
+962793  [APED] p0(L,74)->p1 "Aped Log[493~493]"
+962793  [APED] p0(L,74)->p2 "Aped Log[412~493]"
+962793  [APED] p0(L,74)->p3 "Aped Log[493~493]"
+962793  [APED] p0(L,74)->p4 "Aped Log[493~493]"
+962877  [APED] p4(F,74) "CMIT(493) APLY(493) Add Log[493~494] log[last]:{74 8727}"
+962877  [APED] p3(F,74) "CMIT(493) APLY(493) Add Log[493~494] log[last]:{74 8727}"
+963506  [Info] p4(F,74) "CMIT(493) APLY(493) LogLen=494 log[last]={74 8727} NextIndex:[563 2 563 162 563] MatchIndex:[-1 -1 -1 -1 -1]"
+963549  [Info] p1(F,74) "CMIT(493) APLY(493) LogLen=494 log[last]={74 8727} NextIndex:[2 2 2 2 2] MatchIndex:[1 -1 -1 1 1]"
+963549  [Info] p0(L,74) "CMIT(493) APLY(493) LogLen=494 log[last]={74 8727} NextIndex:[493 493 412 493 493] MatchIndex:[-1 492 -1 492 492]"
+963549  [APED] p0(L,74)->p1 "Aped Log[493~493]"
+963549  [APED] p0(L,74)->p2 "Aped Log[412~493]"
+963549  [APED] p0(L,74)->p3 "Aped Log[493~493]"
+963549  [APED] p0(L,74)->p4 "Aped Log[493~493]"
+963606  [Info] p2(F,74) "CMIT(141) APLY(141) LogLen=411 log[last]={48 9254} NextIndex:[415 136 415 142 415] MatchIndex:[-1 -1 -1 -1 -1]"
+963606  [Info] p3(F,74) "CMIT(493) APLY(493) LogLen=494 log[last]={74 8727} NextIndex:[2 86 86 86 86] MatchIndex:[-1 -1 -1 -1 -1]"
+963632  [APED] p3(F,74) "CMIT(493) APLY(493) Add Log[493~494] log[last]:{74 8727}"
+963765  [APED] p4(F,74) "CMIT(493) APLY(493) Add Log[493~494] log[last]:{74 8727}"
+964307  [APED] p0(L,74)->p1 "Aped Log[493~493]"
+964307  [APED] p0(L,74)->p2 "Aped Log[411~493]"
+964307  [APED] p0(L,74)->p4 "Aped Log[493~493]"
+964389  [APED] p4(F,74) "CMIT(493) APLY(493) Add Log[493~494] log[last]:{74 8727}"
+964543  [APED] p1(F,74) "CMIT(493) APLY(493) Add Log[493~494] log[last]:{74 8727}"
+965086  [APED] p0(L,74)->p1 "Aped Log[493~493]"
+965086  [APED] p0(L,74)->p2 "Aped Log[411~493]"
+965838  [APED] p0(L,74)->p1 "Aped Log[493~493]"
+965843  [APED] p0(L,74)->p2 "Aped Log[410~493]"
+965998  [APED] p1(F,74) "CMIT(493) APLY(493) Add Log[493~494] log[last]:{74 8727}"
+966597  [APED] p0(L,74)->p2 "Aped Log[413~493]"
+967287  [Info] p4(F,74) "CMIT(493) APLY(493) LogLen=494 log[last]={74 8727} NextIndex:[563 2 563 162 563] MatchIndex:[-1 -1 -1 -1 -1]"
+967355  [Info] p0(L,74) "CMIT(493) APLY(493) LogLen=494 log[last]={74 8727} NextIndex:[493 494 413 494 493] MatchIndex:[-1 493 -1 493 492]"
+967355  [APED] p0(L,74)->p2 "Aped Log[413~493]"
+967355  [APED] p0(L,74)->p4 "Aped Log[493~493]"
+967376  [Info] p3(F,74) "CMIT(493) APLY(493) LogLen=494 log[last]={74 8727} NextIndex:[2 86 86 86 86] MatchIndex:[-1 -1 -1 -1 -1]"
+967376  [Info] p2(F,74) "CMIT(141) APLY(141) LogLen=409 log[last]={48 4784} NextIndex:[415 136 415 142 415] MatchIndex:[-1 -1 -1 -1 -1]"
+967390  [Info] p1(F,74) "CMIT(493) APLY(493) LogLen=494 log[last]={74 8727} NextIndex:[2 2 2 2 2] MatchIndex:[1 -1 -1 1 1]"
+967573  [APED] p4(F,74) "CMIT(493) APLY(493) Add Log[493~494] log[last]:{74 8727}"
+968109  [APED] p0(L,74)->p2 "Aped Log[200~493]"
+968109  [APED] p0(L,74)->p4 "Aped Log[493~493]"
+968175  [APED] p4(F,74) "CMIT(493) APLY(493) Add Log[493~494] log[last]:{74 8727}"
+968862  [APED] p0(L,74)->p2 "Aped Log[200~493]"
+969616  [APED] p0(L,74)->p2 "Aped Log[200~493]"
+970376  [APED] p0(L,74)->p2 "Aped Log[200~493]"
+971046  [Info] p4(F,74) "CMIT(493) APLY(493) LogLen=494 log[last]={74 8727} NextIndex:[563 2 563 162 563] MatchIndex:[-1 -1 -1 -1 -1]"
+971127  [Info] p0(L,74) "CMIT(493) APLY(493) LogLen=494 log[last]={74 8727} NextIndex:[493 494 200 494 494] MatchIndex:[-1 493 -1 493 493]"
+971127  [APED] p0(L,74)->p2 "Aped Log[200~493]"
+971195  [Info] p3(F,74) "CMIT(493) APLY(493) LogLen=494 log[last]={74 8727} NextIndex:[2 86 86 86 86] MatchIndex:[-1 -1 -1 -1 -1]"
+971195  [Info] p2(F,74) "CMIT(141) APLY(141) LogLen=199 log[last]={33 853} NextIndex:[415 136 415 142 415] MatchIndex:[-1 -1 -1 -1 -1]"
+971195  [Info] p1(F,74) "CMIT(493) APLY(493) LogLen=494 log[last]={74 8727} NextIndex:[2 2 2 2 2] MatchIndex:[1 -1 -1 1 1]"
+971887  [APED] p0(L,74)->p2 "Aped Log[199~493]"
+972645  [APED] p0(L,74)->p2 "Aped Log[199~493]"
+973405  [APED] p0(L,74)->p2 "Aped Log[199~493]"
+974159  [APED] p0(L,74)->p2 "Aped Log[198~493]"
+974919  [APED] p0(L,74)->p2 "Aped Log[198~493]"
+975679  [APED] p0(L,74)->p2 "Aped Log[412~493]"
+
+
+
+974841  [Info] p4(F,74) "CMIT(493) APLY(493) LogLen=494 log[last]={74 8727}"
+974919  [Info] p0(L,74) "CMIT(493) APLY(493) LogLen=494 log[last]={74 8727}"
+974988  [Info] p3(F,74) "CMIT(493) APLY(493) LogLen=494 log[last]={74 8727}"
+974988  [Info] p2(F,74) "CMIT(141) APLY(141) LogLen=198 log[last]={33 9861}"
+974988  [Info] p1(F,74) "CMIT(493) APLY(493) LogLen=494 log[last]={74 8727}"
+
+
+
+
+976364  [Start] p0(L,74) "Add Log:{74 8727}"
+976436  [APED] p0(L,74)->p1 "Aped Log[494~494]"
+976436  [APED] p0(L,74)->p2 "Aped Log[162~494]"
+976436  [APED] p0(L,74)->p3 "Aped Log[494~494]"
+976436  [APED] p0(L,74)->p4 "Aped Log[494~494]"
+976651  [APED] p4(F,74) "CMIT(493) APLY(493) Add Log[494~495] log[last]:{74 8727}"
+976679  [APED] p1(F,74) "CMIT(493) APLY(493) Add Log[494~495] log[last]:{74 8727}"
+977192  [APED] p0(L,74)->p1 "Aped Log[494~494]"
+977192  [APED] p0(L,74)->p2 "Aped Log[200~494]"
+977192  [APED] p0(L,74)->p3 "Aped Log[494~494]"
+977192  [APED] p0(L,74)->p4 "Aped Log[494~494]"
+977192  [APED] p4(F,74) "CMIT(493) APLY(493) Add Log[494~495] log[last]:{74 8727}"
+977346  [APED] p3(F,74) "CMIT(493) APLY(493) Add Log[494~495] log[last]:{74 8727}"
+977405  [APED] p1(F,74) "CMIT(493) APLY(493) Add Log[494~495] log[last]:{74 8727}"
+977946  [APED] p0(L,74)->p1 "Aped Log[494~494]"
+977946  [APED] p0(L,74)->p2 "Aped Log[162~494]"
+977946  [APED] p0(L,74)->p3 "Aped Log[494~494]"
+978020  [APED] p1(F,74) "CMIT(493) APLY(493) Add Log[494~495] log[last]:{74 8727}"
+978025  [CMIT] p0(L,74) CMIT(493->494)
+978025  [APLY] p0(L,74) "CMIT(494) APLY(493+1) apply {74 8727}"
+978096  [APED] p3(F,74) "CMIT(493) APLY(493) Add Log[494~495] log[last]:{74 8727}"
+978623  [Info] p4(F,74) "CMIT(493) APLY(493) LogLen=495 log[last]={74 8727} NextIndex:[563 2 563 162 563] MatchIndex:[-1 -1 -1 -1 -1]"
+978697  [Info] p0(L,74) "CMIT(494) APLY(494) LogLen=495 log[last]={74 8727} NextIndex:[493 495 162 494 494] MatchIndex:[-1 494 -1 493 493]"
+978698  [APED] p0(L,74)->p2 "Aped Log[162~494]"
+978698  [APED] p0(L,74)->p3 "Aped Log[494~494]"
+978698  [APED] p0(L,74)->p4 "Aped Log[494~494]"
+978740  [APED] p4(F,74) "CMIT(493) APLY(493) Add Log[494~495] log[last]:{74 8727}"
+978740  [CMIT] p4(F,74) "CMIT(493->494)"
+978740  [APLY] p4(F,74) "CMIT(494) APLY(493+1) apply {74 8727}"
+978772  [Info] p3(F,74) "CMIT(493) APLY(493) LogLen=495 log[last]={74 8727} NextIndex:[2 86 86 86 86] MatchIndex:[-1 -1 -1 -1 -1]"
+978772  [Info] p2(F,74) "CMIT(141) APLY(141) LogLen=161 log[last]={14 7495} NextIndex:[415 136 415 142 415] MatchIndex:[-1 -1 -1 -1 -1]"
+978772  [Info] p1(F,74) "CMIT(493) APLY(493) LogLen=495 log[last]={74 8727} NextIndex:[2 2 2 2 2] MatchIndex:[1 -1 -1 1 1]"
+978837  [CMIT] p1(F,74) "CMIT(493->494)"
+978837  [APED] p3(F,74) "CMIT(493) APLY(493) Add Log[494~495] log[last]:{74 8727}"
+978837  [APLY] p1(F,74) "CMIT(494) APLY(493+1) apply {74 8727}"
+978837  [CMIT] p3(F,74) "CMIT(493->494)"
+978837  [APLY] p3(F,74) "CMIT(494) APLY(493+1) apply {74 8727}"
+979452  [APED] p0(L,74)->p2 "Aped Log[162~494]"
+979452  [APED] p0(L,74)->p3 "Aped Log[494~494]"
+979452  [APED] p0(L,74)->p4 "Aped Log[494~494]"
+979496  [APED] p3(F,74) "CMIT(494) APLY(494) Add Log[494~495] log[last]:{74 8727}"
+979565  [APED] p4(F,74) "CMIT(494) APLY(494) Add Log[494~495] log[last]:{74 8727}"
+980209  [APED] p0(L,74)->p1 "Aped Log[494~494]"
+980209  [APED] p0(L,74)->p2 "Aped Log[162~494]"
+980209  [APED] p0(L,74)->p3 "Aped Log[494~494]"
+980209  [APED] p0(L,74)->p4 "Aped Log[494~494]"
+980323  [APED] p1(F,74) "CMIT(494) APLY(494) Add Log[494~495] log[last]:{74 8727}"
+980408  [APED] p3(F,74) "CMIT(494) APLY(494) Add Log[494~495] log[last]:{74 8727}"
+980450  [APED] p4(F,74) "CMIT(494) APLY(494) Add Log[494~495] log[last]:{74 8727}"
+980969  [APED] p0(L,74)->p1 "Aped Log[494~494]"
+980969  [APED] p0(L,74)->p2 "Aped Log[162~494]"
+980969  [APED] p0(L,74)->p3 "Aped Log[494~494]"
+980969  [APED] p0(L,74)->p4 "Aped Log[494~494]"
+980999  [APED] p1(F,74) "CMIT(494) APLY(494) Add Log[494~495] log[last]:{74 8727}"
+981084  [APED] p3(F,74) "CMIT(494) APLY(494) Add Log[494~495] log[last]:{74 8727}"
+981725  [APED] p0(L,74)->p1 "Aped Log[494~494]"
+981725  [APED] p0(L,74)->p2 "Aped Log[161~494]"
+981725  [APED] p0(L,74)->p3 "Aped Log[494~494]"
+981725  [APED] p0(L,74)->p4 "Aped Log[494~494]"
+981808  [APED] p1(F,74) "CMIT(494) APLY(494) Add Log[494~495] log[last]:{74 8727}"
+981924  [APED] p3(F,74) "CMIT(494) APLY(494) Add Log[494~495] log[last]:{74 8727}"
+982403  [Info] p4(F,74) "CMIT(494) APLY(494) LogLen=495 log[last]={74 8727} NextIndex:[563 2 563 162 563] MatchIndex:[-1 -1 -1 -1 -1]"
+982483  [Info] p0(L,74) "CMIT(494) APLY(494) LogLen=495 log[last]={74 8727} NextIndex:[493 495 161 494 495] MatchIndex:[-1 494 -1 493 494]"
+982483  [APED] p0(L,74)->p2 "Aped Log[161~494]"
+982483  [APED] p0(L,74)->p3 "Aped Log[494~494]"
+982537  [APED] p3(F,74) "CMIT(494) APLY(494) Add Log[494~495] log[last]:{74 8727}"
+982548  [Info] p2(F,74) "CMIT(141) APLY(141) LogLen=161 log[last]={14 7495} NextIndex:[415 136 415 142 415] MatchIndex:[-1 -1 -1 -1 -1]"
+982548  [Info] p3(F,74) "CMIT(494) APLY(494) LogLen=495 log[last]={74 8727} NextIndex:[2 86 86 86 86] MatchIndex:[-1 -1 -1 -1 -1]"
+982548  [Info] p1(F,74) "CMIT(494) APLY(494) LogLen=495 log[last]={74 8727} NextIndex:[2 2 2 2 2] MatchIndex:[1 -1 -1 1 1]"
+983243  [APED] p0(L,74)->p2 "Aped Log[161~494]"
+983243  [APED] p0(L,74)->p3 "Aped Log[494~494]"
+983411  [APED] p3(F,74) "CMIT(494) APLY(494) Add Log[494~495] log[last]:{74 8727}"
+983998  [APED] p0(L,74)->p2 "Aped Log[161~494]"
+983998  [APED] p0(L,74)->p3 "Aped Log[494~494]"
+984075  [APED] p3(F,74) "CMIT(494) APLY(494) Add Log[494~495] log[last]:{74 8727}"
+984749  [APED] p0(L,74)->p2 "Aped Log[161~494]"
+985505  [APED] p0(L,74)->p2 "Aped Log[161~494]"
+986182  [Info] p4(F,74) "CMIT(494) APLY(494) LogLen=495 log[last]={74 8727} NextIndex:[563 2 563 162 563] MatchIndex:[-1 -1 -1 -1 -1]"
+986257  [Info] p0(L,74) "CMIT(494) APLY(494) LogLen=495 log[last]={74 8727} NextIndex:[493 495 160 495 495] MatchIndex:[-1 494 -1 494 494]"
+986257  [APED] p0(L,74)->p2 "Aped Log[160~494]"
+986322  [Info] p2(F,74) "CMIT(141) APLY(141) LogLen=160 log[last]={14 7083} NextIndex:[415 136 415 142 415] MatchIndex:[-1 -1 -1 -1 -1]"
+986322  [Info] p3(F,74) "CMIT(494) APLY(494) LogLen=495 log[last]={74 8727} NextIndex:[2 86 86 86 86] MatchIndex:[-1 -1 -1 -1 -1]"
+986322  [Info] p1(F,74) "CMIT(494) APLY(494) LogLen=495 log[last]={74 8727} NextIndex:[2 2 2 2 2] MatchIndex:[1 -1 -1 1 1]"
+987014  [APED] p0(L,74)->p2 "Aped Log[160~494]"
+987769  [APED] p0(L,74)->p2 "Aped Log[197~494]"
+988534  [APED] p0(L,74)->p2 "Aped Log[159~494]"
+989294  [APED] p0(L,74)->p2 "Aped Log[159~494]"
+989962  [Info] p4(F,74) "CMIT(494) APLY(494) LogLen=495 log[last]={74 8727} NextIndex:[563 2 563 162 563] MatchIndex:[-1 -1 -1 -1 -1]"
+990061  [Info] p0(L,74) "CMIT(494) APLY(494) LogLen=495 log[last]={74 8727} NextIndex:[493 494 159 495 495] MatchIndex:[-1 493 -1 494 494]"
+990061  [APED] p0(L,74)->p1 "Aped Log[494~494]"
+990061  [APED] p0(L,74)->p2 "Aped Log[159~494]"
+990104  [Info] p3(F,74) "CMIT(494) APLY(494) LogLen=495 log[last]={74 8727} NextIndex:[2 86 86 86 86] MatchIndex:[-1 -1 -1 -1 -1]"
+990104  [Info] p2(F,74) "CMIT(141) APLY(141) LogLen=158 log[last]={14 581} NextIndex:[415 136 415 142 415] MatchIndex:[-1 -1 -1 -1 -1]"
+990104  [Info] p1(F,74) "CMIT(494) APLY(494) LogLen=495 log[last]={74 8727} NextIndex:[2 2 2 2 2] MatchIndex:[1 -1 -1 1 1]"
+990141  [APED] p1(F,74) "CMIT(494) APLY(494) Add Log[494~495] log[last]:{74 8727}"
+990817  [APED] p0(L,74)->p2 "Aped Log[161~494]"
+991577  [APED] p0(L,74)->p2 "Aped Log[161~494]"
+992366  [APED] p0(L,74)->p2 "Aped Log[158~494]"
+993121  [APED] p0(L,74)->p2 "Aped Log[133~494]"
+
+993877  [APED] p0(L,74)->p2 "Aped Log[158~494]"
+994634  [APED] p0(L,74)->p2 "Aped Log[158~494]"
+995439  [APED] p0(L,74)->p2 "Aped Log[158~494]"
+996201  [APED] p0(L,74)->p2 "Aped Log[158~494]"
+
+
+993748  [Info] p4(F,74) "CMIT(494) APLY(494) LogLen=495 log[last]={74 8727}"
+993877  [Info] p0(L,74) "CMIT(494) APLY(494) LogLen=495 log[last]={74 8727}"
+993931  [Info] p1(F,74) "CMIT(494) APLY(494) LogLen=495 log[last]={74 8727}"
+993931  [Info] p2(F,74) "CMIT(141) APLY(141) LogLen=157 log[last]={14 2826}"
+993931  [Info] p3(F,74) "CMIT(494) APLY(494) LogLen=495 log[last]={74 8727}"
+
+
+
+
+996392  [Start] p0(L,74) "Add Log:{74 8727}"
+996955  [APED] p0(L,74)->p1 "Aped Log[495~495]"
+996955  [APED] p0(L,74)->p2 "Aped Log[157~495]"
+996955  [APED] p0(L,74)->p3 "Aped Log[495~495]"
+996955  [APED] p0(L,74)->p4 "Aped Log[495~495]"
+997078  [APED] p3(F,74) "CMIT(494) APLY(494) Add Log[495~496] log[last]:{74 8727}"
+997099  [APED] p4(F,74) "CMIT(494) APLY(494) Add Log[495~496] log[last]:{74 8727}"
+997124  [APED] p1(F,74) "CMIT(494) APLY(494) Add Log[495~496] log[last]:{74 8727}"
+997544  [Info] p4(F,74) "CMIT(494) APLY(494) LogLen=496 log[last]={74 8727} NextIndex:[563 2 563 162 563] MatchIndex:[-1 -1 -1 -1 -1]"
+997713  [Info] p0(L,74) "CMIT(494) APLY(494) LogLen=496 log[last]={74 8727} NextIndex:[493 495 160 495 496] MatchIndex:[-1 494 -1 494 495]"
+997713  [APED] p0(L,74)->p1 "Aped Log[495~495]"
+997713  [APED] p0(L,74)->p2 "Aped Log[160~495]"
+997713  [APED] p0(L,74)->p3 "Aped Log[495~495]"
+997713  [APED] p1(F,74) "CMIT(494) APLY(494) Add Log[495~496] log[last]:{74 8727}"
+997767  [Info] p3(F,74) "CMIT(494) APLY(494) LogLen=496 log[last]={74 8727} NextIndex:[2 86 86 86 86] MatchIndex:[-1 -1 -1 -1 -1]"
+997767  [Info] p1(F,74) "CMIT(494) APLY(494) LogLen=496 log[last]={74 8727} NextIndex:[2 2 2 2 2] MatchIndex:[1 -1 -1 1 1]"
+997767  [Info] p2(F,74) "CMIT(141) APLY(141) LogLen=157 log[last]={14 2826} NextIndex:[415 136 415 142 415] MatchIndex:[-1 -1 -1 -1 -1]"
+997822  [APED] p3(F,74) "CMIT(494) APLY(494) Add Log[495~496] log[last]:{74 8727}"
+998463  [APED] p0(L,74)->p1 "Aped Log[495~495]"
+998463  [APED] p0(L,74)->p2 "Aped Log[160~495]"
+998463  [APED] p0(L,74)->p3 "Aped Log[495~495]"
+998520  [APED] p3(F,74) "CMIT(494) APLY(494) Add Log[495~496] log[last]:{74 8727}"
+998526  [CMIT] p0(L,74) CMIT(494->495)
+998526  [APLY] p0(L,74) "CMIT(495) APLY(494+1) apply {74 8727}"
+999214  [APED] p0(L,74)->p1 "Aped Log[495~495]"
+999214  [APED] p0(L,74)->p2 "Aped Log[160~495]"
+999375  [APED] p1(F,74) "CMIT(494) APLY(494) Add Log[495~496] log[last]:{74 8727}"
+999375  [CMIT] p1(F,74) "CMIT(494->495)"
+999375  [APLY] p1(F,74) "CMIT(495) APLY(494+1) apply {74 8727}"
+999435  [CMIT] p4(F,74) "CMIT(494->495)"
+999435  [APLY] p4(F,74) "CMIT(495) APLY(494+1) apply {74 8727}"
+999967  [APED] p0(L,74)->p2 "Aped Log[157~495]"
+999967  [APED] p0(L,74)->p3 "Aped Log[495~495]"
+1000052  [APED] p3(F,74) "CMIT(494) APLY(494) Add Log[495~496] log[last]:{74 8727}"
+1000052  [CMIT] p3(F,74) "CMIT(494->495)"
+1000052  [APLY] p3(F,74) "CMIT(495) APLY(494+1) apply {74 8727}"
+1000724  [APED] p0(L,74)->p1 "Aped Log[495~495]"
+1000724  [APED] p0(L,74)->p2 "Aped Log[157~495]"
+1000777  [APED] p1(F,74) "CMIT(495) APLY(495) Add Log[495~496] log[last]:{74 8727}"
+1001319  [Info] p4(F,74) "CMIT(495) APLY(495) LogLen=496 log[last]={74 8727} NextIndex:[563 2 563 162 563] MatchIndex:[-1 -1 -1 -1 -1]"
+1001478  [Info] p0(L,74) "CMIT(495) APLY(495) LogLen=496 log[last]={74 8727} NextIndex:[493 495 157 495 496] MatchIndex:[-1 494 -1 494 495]"
+1001478  [APED] p0(L,74)->p1 "Aped Log[495~495]"
+1001478  [APED] p0(L,74)->p2 "Aped Log[157~495]"
+1001478  [APED] p0(L,74)->p3 "Aped Log[495~495]"
+1001478  [APED] p3(F,74) "CMIT(495) APLY(495) Add Log[495~496] log[last]:{74 8727}"
+1001547  [Info] p1(F,74) "CMIT(495) APLY(495) LogLen=496 log[last]={74 8727} NextIndex:[2 2 2 2 2] MatchIndex:[1 -1 -1 1 1]"
+1001547  [Info] p3(F,74) "CMIT(495) APLY(495) LogLen=496 log[last]={74 8727} NextIndex:[2 86 86 86 86] MatchIndex:[-1 -1 -1 -1 -1]"
+1001547  [Info] p2(F,74) "CMIT(141) APLY(141) LogLen=156 log[last]={14 477} NextIndex:[415 136 415 142 415] MatchIndex:[-1 -1 -1 -1 -1]"
+1001589  [APED] p1(F,74) "CMIT(495) APLY(495) Add Log[495~496] log[last]:{74 8727}"
+1002229  [APED] p0(L,74)->p1 "Aped Log[495~495]"
+1002229  [APED] p0(L,74)->p2 "Aped Log[157~495]"
+1002229  [APED] p0(L,74)->p4 "Aped Log[495~495]"
+1002257  [APED] p4(F,74) "CMIT(495) APLY(495) Add Log[495~496] log[last]:{74 8727}"
+1002340  [APED] p1(F,74) "CMIT(495) APLY(495) Add Log[495~496] log[last]:{74 8727}"
+1002989  [APED] p0(L,74)->p1 "Aped Log[495~495]"
+1002989  [APED] p0(L,74)->p2 "Aped Log[157~495]"
+1002989  [APED] p0(L,74)->p3 "Aped Log[495~495]"
+1003094  [APED] p1(F,74) "CMIT(495) APLY(495) Add Log[495~496] log[last]:{74 8727}"
+1003200  [APED] p3(F,74) "CMIT(495) APLY(495) Add Log[495~496] log[last]:{74 8727}"
+1003744  [APED] p0(L,74)->p1 "Aped Log[495~495]"
+1003744  [APED] p0(L,74)->p2 "Aped Log[157~495]"
+1003744  [APED] p0(L,74)->p3 "Aped Log[495~495]"
+1003860  [APED] p1(F,74) "CMIT(495) APLY(495) Add Log[495~496] log[last]:{74 8727}"
+1004007  [APED] p3(F,74) "CMIT(495) APLY(495) Add Log[495~496] log[last]:{74 8727}"
+1004504  [APED] p0(L,74)->p2 "Aped Log[157~495]"
+1005087  [Info] p4(F,74) "CMIT(495) APLY(495) LogLen=496 log[last]={74 8727} NextIndex:[563 2 563 162 563] MatchIndex:[-1 -1 -1 -1 -1]"
+1005258  [Info] p0(L,74) "CMIT(495) APLY(495) LogLen=496 log[last]={74 8727} NextIndex:[493 496 157 496 496] MatchIndex:[-1 495 -1 495 495]"
+1005258  [APED] p0(L,74)->p2 "Aped Log[157~495]"
+1005321  [Info] p1(F,74) "CMIT(495) APLY(495) LogLen=496 log[last]={74 8727} NextIndex:[2 2 2 2 2] MatchIndex:[1 -1 -1 1 1]"
+1005321  [Info] p2(F,74) "CMIT(141) APLY(141) LogLen=156 log[last]={14 477} NextIndex:[415 136 415 142 415] MatchIndex:[-1 -1 -1 -1 -1]"
+1005321  [Info] p3(F,74) "CMIT(495) APLY(495) LogLen=496 log[last]={74 8727} NextIndex:[2 86 86 86 86] MatchIndex:[-1 -1 -1 -1 -1]"
+1006008  [APED] p0(L,74)->p2 "Aped Log[156~495]"
+1006773  [APED] p0(L,74)->p1 "Aped Log[495~495]"
+1006773  [APED] p0(L,74)->p2 "Aped Log[157~495]"
+1007002  [APED] p1(F,74) "CMIT(495) APLY(495) Add Log[495~496] log[last]:{74 8727}"
+1007538  [APED] p0(L,74)->p1 "Aped Log[495~495]"
+1007538  [APED] p0(L,74)->p2 "Aped Log[157~495]"
+1007729  [APED] p1(F,74) "CMIT(495) APLY(495) Add Log[495~496] log[last]:{74 8727}"
+1008289  [APED] p0(L,74)->p2 "Aped Log[156~495]"
+1008868  [Info] p4(F,74) "CMIT(495) APLY(495) LogLen=496 log[last]={74 8727} NextIndex:[563 2 563 162 563] MatchIndex:[-1 -1 -1 -1 -1]"
+1009040  [Info] p0(L,74) "CMIT(495) APLY(495) LogLen=496 log[last]={74 8727} NextIndex:[493 496 155 496 496] MatchIndex:[-1 495 -1 495 495]"
+1009040  [APED] p0(L,74)->p2 "Aped Log[155~495]"
+1009105  [Info] p1(F,74) "CMIT(495) APLY(495) LogLen=496 log[last]={74 8727} NextIndex:[2 2 2 2 2] MatchIndex:[1 -1 -1 1 1]"
+1009105  [Info] p3(F,74) "CMIT(495) APLY(495) LogLen=496 log[last]={74 8727} NextIndex:[2 86 86 86 86] MatchIndex:[-1 -1 -1 -1 -1]"
+1009105  [Info] p2(F,74) "CMIT(141) APLY(141) LogLen=155 log[last]={14 3135} NextIndex:[415 136 415 142 415] MatchIndex:[-1 -1 -1 -1 -1]"
+1009798  [APED] p0(L,74)->p2 "Aped Log[155~495]"
+1010556  [APED] p0(L,74)->p2 "Aped Log[157~495]"
+1011309  [APED] p0(L,74)->p2 "Aped Log[157~495]"
+1012068  [APED] p0(L,74)->p2 "Aped Log[157~495]"
+1012651  [Info] p4(F,74) "CMIT(495) APLY(495) LogLen=496 log[last]={74 8727} NextIndex:[563 2 563 162 563] MatchIndex:[-1 -1 -1 -1 -1]"
+1012830  [Info] p0(L,74) "CMIT(495) APLY(495) LogLen=496 log[last]={74 8727} NextIndex:[493 496 157 496 496] MatchIndex:[-1 495 -1 495 495]"
+1012830  [APED] p0(L,74)->p2 "Aped Log[157~495]"
+1012885  [Info] p2(F,74) "CMIT(141) APLY(141) LogLen=154 log[last]={14 721} NextIndex:[415 136 415 142 415] MatchIndex:[-1 -1 -1 -1 -1]"
+1012885  [Info] p1(F,74) "CMIT(495) APLY(495) LogLen=496 log[last]={74 8727} NextIndex:[2 2 2 2 2] MatchIndex:[1 -1 -1 1 1]"
+1012885  [Info] p3(F,74) "CMIT(495) APLY(495) LogLen=496 log[last]={74 8727} NextIndex:[2 86 86 86 86] MatchIndex:[-1 -1 -1 -1 -1]"
+1013587  [APED] p0(L,74)->p2 "Aped Log[154~495]"
+1014340  [APED] p0(L,74)->p2 "Aped Log[155~495]"
+1015097  [APED] p0(L,74)->p2 "Aped Log[157~495]"
+1015854  [APED] p0(L,74)->p2 "Aped Log[156~495]"
+
+
+
+--- FAIL: TestFigure8Unreliable3C (43.48s)
+    config.go:605: one(8727) failed to reach agreement

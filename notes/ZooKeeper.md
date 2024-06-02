@@ -4,23 +4,19 @@
 
 在这之前有必要再来复习一下关于**正确**的定义, 尽管在`6.5840`的新版课程中提前安排了[Linearizability](https://anishathalye.com/testing-distributed-systems-for-linearizability/)这部分的阅读, 不过现在已经有一些遗忘.
 
-```
-一个系统的执行历史是一系列的客户端请求,有可能来自一个或多个, 如果我们能找到一个与实际请求相符合的执行顺序, 那么它(请求历史)就是线性一致的.
-```
+一个系统的执行历史, 或一系列来自客户端的请求, 我们定义**请求(执行)序列**为`能够反应这些请求的执行顺序的逻辑排列`, 如果我们能够在下述**规定**下找到满足下述**条件**的一个序列, 那么我们说这个系统处理这批客户端的结果是**线性的**. 注意, 这一属性并不是说某个系统.
 
-例子中的一个操作:`|-----W(x=1)------|`, 第一个`|`表示客户端发送请求, 第二个`|`表示收到回复, 也就是说对于写操作`x=1`, 在这之间完成.
+在给出具体的**规定**和**条件**前, 让我们来定义一个最基本的**客户端请求**, 例子中的一个操作:`|-----W(x=1)------|`, 第一个`|`表示客户端在此刻发送了一个请求给系统, 第二个`|`表示客户端收到来自系统的回复, `W(x=1)`表示这次请求客户端希望系统修改变量`x`的值为`1`.
 
+**规定:** 在同一个逻辑时间下, 如果两个客户端请求没有交集(即两个`|`完全分离), 那么在序列中, 这两次操作必须严格遵守逻辑时间执行
 
-```
-如果我们能构建一个序列, 同时满足条件1和条件2, 那么可以说请求历史是线性的
+**条件:** 按照序列执行后, 每个读请求得到的结果均来自前面最近的一次写请求.
 
-1 序列中的请求顺序与实际时间匹配
-2 每个读请求看到的都是序列中前一个写请求写入的值
-```
+---
 
-在按照Morris的方式去进行上面两个条件的判断后, 可以发现如果生成了一个带环的图, 那么请求历史就不是线性一致的.
+我们可以在上述可视化的若干个**客户端请求**中绘出一个**执行序列**, 即通过将`|`和`|`标上有向箭头的方式来表述先执行与后执行的请求, 如果最终得到的是一个带环的图才能满足**条件**, 那么说请求历史不是线性的.
 
-前面的几个例子都是在上面提到的阅读材料中见过的, 当我们考虑了客户端重发请求的时候, 就有一点不一样了, 考虑这个例子:
+前面的几个例子都是比较朴素, 在上面提到的阅读材料中也见过的, 所以这里不再贴出来了;  然而当我们考虑了各种各样的故障, 使客户端不得不重发请求的时候, 就有一点不一样了, 考虑这个例子:
 
 ```
 C1: |----W(x=3)----|    |----W(x=4)----|
@@ -33,19 +29,24 @@ case2:                |--R(x)----=-------|re------|
 
 如果因为各种各样的问题导致*C2*发出的读*x*请求丢失, 那么它会重发这个读请求, 这个时候我们不得不考虑*C2*收到的回复应该是多少?
 
-如果是`case1`, 假设这个时候`W(x=4)`还没有执行, 那么这条读请求得到的值应该是3, 如果是`case2`, 重发的时机已经在`W(x=4)`结束, 那么读请求应该返回4;
+这取决于*C2*重发这条读请求的时机, 如果是`case1`, 这个时候`W(x=4)`还未在系统上执行, *C2*快速的重发了`R(x)`, 那么系统会答复`x=3`, 也就是上次写操作的值;  如果是`case2`, 由于*C2*设置的超时时间比较久, 重发`R(x)`比较迟, 现在系统已经收到`W(x=4)`的请求并执行了它, 那么返回给*C2*的值就是4.
 
-这个时候我们必须从客户端的角度来定义线性一致性, 如果我们在`case1`标注的返回时间返回*x*
+不管这里*C2*收到的值是3还是4, 站在系统的视角下, 你可能会说`噢! 请求传到我这里的时间就是这样的, 所以这两个情况下这段序列都是线性的`, 但是站在客户端*C2*的角度, 客户端只知道自己在第一个`|`的时刻发送了读请求, 那么理所应当得到的值就应该是3.
+
+我们根据写过的实验展开来讲讲返回值是3or4, 这其实涉及到的是重发机制是如何实现, 以及是什么原因导致的重发.
+
+1. 如果发送给系统的*rpc*丢失, 那么系统只能无奈地返回4给客户端.
+2. 如果是系统返回给客户端的*rpc*丢失, 那么系统可能会设计得来记录这次请求的返回值, 然后如果再次收到该请求, 就发送记录的值, 那么就是3, 这也是我们在*k/v server*实验里为了保证幂等性做的操作
 
 ## LEC notes
 
 1. `[53:00]` zookeeper is not a strict ReadWrite system, there are actually writes that imply reads also, and for those sort of mixed writes those those you know any any operation that modifies the state is linearizable with respect to all other operations that modify the state.
 
-例如,一个客户端可能需要先读取一个znode的当前值,然后基于这个值来更新znode, 所以*zk*提供的第第一个保证: `all requests that update the state of ZooKeeper are serializable and respect precedence`, 不是说写操作是线性化的, 而是: **任何修改状态的操作都是线性化的**
+例如,一个客户端可能需要先读取某个znode的值,然后基于这个值来更新一个znode, 所以*zk*提供的第一个保证: `all requests that update the state of ZooKeeper are serializable and respect precedence`, 不是说写操作是线性化的, 而是: **任何修改状态的操作都是线性化的**  (这里论文里用词很准确*update*而不是*write*, 只是自己读的时候传成了写操作)
 
 2. `[53:00]` ...and furthermore, that the successive reads have to observe points that don't go backwards that is if a client issues one read and then another read and the first read executes at this point in the log, the second read is that you know allowed to execute it the same or later points in the log but not allowed to see a previous state by issue one read and then another read, the second read has to see a state that's at least as up-to-data as the first state ... and where this is especialy exciting is that if the client is talkinguto one replica for a while and it issues some reads suppose issue read here, if the replica fails, and the client needs to start sendling its read to another replica, that guaranteed this FIFO client order a guarantee still holds if the client switches to a new replica.
 
-对于读操作, 虽说*zk*没有提供线性化的保障, 但是对单个*client*来说, *zk*保障了其看到的数据在逻辑时钟**zxid**这层意义上是单调递增的. 这一点在以下这个场景的时候比较突出:
+对于读操作, 虽说*zk*没有提供线性化的保障, 但是对单个*client*来说, *zk*保障了其看到的数据在逻辑时钟**zxid**这层意义上是单调递增的, 也就是保证不会使用更旧的值. 这一点在以下这个场景的时候比较突出:
 
 ```
 client     read
@@ -56,13 +57,13 @@ S2: 1  2  3  /  /
               read
 ```
 
-假设客户端发出了两个`read`请求, 在*zk*中, 来自客户端的读请求直接发往*follower*, 假设`S1`收到该读取请求, 返回`zxid=4`的数据给客户端, 然后在`S1`收到第二个`read`请求之前, `S1`挂掉了, 这个时候该请求被发往了`S2`, 那么该读取请求会附带上一次指令的*zxid*(=4), 那么在`S2`中, 可能会等待逻辑时钟增加到4或5才响应这个读请求.
+假设客户端发出了两个`read`请求, 在*zk*中, 来自客户端的读请求直接发往*follower*, 假设`S1`收到该读取请求, 返回`zxid=4`的数据给客户端, 然后在`S1`收到第二个`read`请求之前, `S1`挂掉了, 这个时候该请求被发往了`S2`, 那么该读取请求会附带上一次指令的逻辑时间*zxid*(=4), 因此在`S2`中, 可能会等待逻辑时钟增加到4或5才响应这个读请求.
 
-(当然也有可能将读请求发给其他服务器尝试, 或者S2发送某个特定的消息给`leader`请求这部分同步内容)
+当然也有可能将读请求发给其他服务器尝试, 或者S2看到了这个时间上比自己新的请求, 会请求`leader`同步自己到最新的状态
 
 ## (2.4)Examples of primitives
 
-因为学习的时候见过最多的对*zk*的描述就是其提供了一些*API*用于构建同步原语, 所以我们不得不来具体看看.
+因为学习的时候见过最多的对*zk*的描述就是其提供了一些*API*用于构建同步原语, 所以我们不得不来具体看看这些同步原语利用了*zk*的哪些内容来构建.
 
 ### Configuration Management
 

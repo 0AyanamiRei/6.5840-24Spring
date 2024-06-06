@@ -1,5 +1,17 @@
 # ZooKeeper
 
+**阅读材料** 这些是我阅读该篇论文前前后后浏览过的一些资料, 这里汇总一下:
+
+1. [很好的ZK原论文翻译](https://lmx.gitbook.io/mit6.824/mit-6.824-lun-wen-fan-yi/zookeeper-lun-wen)
+2. [比较小但是各个方面都涉及到的ZK论文总结](https://www.qtmuniao.com/2021/05/31/zookeeper/)
+3. [使用zk的一个例子](http://www.blogjava.net/BucketLi/archive/2010/12/21/341268.html?login=from_csdn)
+4. [简述了zab+zk](https://mr-dai.github.io/zookeeper/)
+
+**疑问** 阅读过程中的一些困惑和自己思考的结果
+
+1. `Caching data on the client side is an important technique to increase the performance of reads`, 这里列出这个问题主要原因是对应用*zookeeper*的场景感到疑惑, 查阅了各种使用zk的示范, 基本都使用zk提供的**原语集api**来构建更加实际的应用.
+2. `ZooKeeper uses a watch mechanism to enable clients to cache data without managing the client cache directly`,  *zk*提供给客户端最重要的一个机制可能就是*watch*, 所以我觉得很有必要思考*watch*在代码上是什么样子的.
+
 ## Linearizability
 
 在这之前有必要再来复习一下关于**正确**的定义, 尽管在`6.5840`的新版课程中提前安排了[Linearizability](https://anishathalye.com/testing-distributed-systems-for-linearizability/)这部分的阅读, 不过现在已经有一些遗忘.
@@ -71,11 +83,17 @@ S2: 1  2  3  /  /
 
 <img src="../pic/zk实现动态管理配置.png" width="400">
 
-假设服务器*S1*和*S2*的一个系统配置`x`, *leader*通过监视进程, 当我们想要修改*S1(2)*的系统配置`x`的值的时候, 监视进程就会通知*leader*重新获取其配置`x`.
+假设服务器*S1*和*S2*的一个系统配置参数`x`, *leader*通过*watches*(上图*watcher*)来动态地获取其他服务器实时的参数设置.  当我们想要修改*S1(2)*的系统配置`x`的值的时候, 监视进程就会通知 *leader* 询问 *S1(2)* 以更新其配置参数.
 
 猜测这个机制是通过*leader*为每个服务器创建一个额外的线程(进程), 当我们对某个*znode*设置监视的时候, 就设置标记`watch flag`, 一个初始的状态就是, *S1*的`x=4, watchFlag=true`, 监视线程定期检查该`watchFlag`,  某个时刻我们修改`x=5`, 那么我们会设置`watchFlag=false`, 然后监视线程发现后就会通知*leader*重新读取*S1*的该*znode*的数据;
 
-论文中提到的例子也就是说, 在修改`x=5`, 设置`watchFlag=false`后, *watcher*通知*leader*, *leader*重新读取*S1*这里的*znode*这个时间段内, 我们反复修改`x=3`->`x=2`->....->`x=7`, 监视线程都不会再观察到, 放在我们的实验中, 就是不会多次向*leader*发送*RPC*------因为现在*watcher*告诉*leader*的事情就是, "`S1`的配置信息被更新了, 现在你持有的数据是旧的, 需要重新读取". *leader*重新读到*S1*的配置信息后, 我们可以以发送*RPC*消息的方式, 将记录*S1*配置信息的*znode*设置为`watchFlag=true`, 然后监视线程重新定期检查`watchFlag`.
+论文中提到的例子是说: 
+
+在时间点**a:** *S1*修改其配置参数`x`为5, 设置`watchFlag=false`后, 
+
+
+
+*watcher*通知*leader*, *leader*重新读取*S1*这里的*znode*这个时间段内, 我们反复修改`x=3`->`x=2`->....->`x=7`, 监视线程都不会再观察到, 放在我们的实验中, 就是不会多次向*leader*发送*RPC*------因为现在*watcher*告诉*leader*的事情就是, "`S1`的配置信息被更新了, 现在你持有的数据是旧的, 需要重新读取". *leader*重新读到*S1*的配置信息后, 我们可以以发送*RPC*消息的方式, 将记录*S1*配置信息的*znode*设置为`watchFlag=true`, 然后监视线程重新定期检查`watchFlag`.
 
 ### Rendezvous
 

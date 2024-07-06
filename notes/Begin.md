@@ -8,11 +8,11 @@ LEC     paper6.824         paper6.5840
 2       Go tutorial        Go tutorial   
 3       GFS-----------ok   None
 4       FTVM               Linearizability(NEW)------------ok
-5       TGMM               The Go..(NEW)-------------------pass
+5       go的内存模型        The Go..(NEW)-------------------pass
 6       Raft 1~5-----ok    GFS-----------------------------ok
 7       Raft 7~end---ok    Raft 1~5------------------------ok
 8       ZooKeeper          Raft 7~end----------------------ok
-9       CRAQ               ZooKeeper
+9       CRAQ ----ok        ZooKeeper-----------------------need review, but just ok
 10      Aurora             None
 11      Frangipani         Grove(NEW)
 12      6.033-9            6.033-9

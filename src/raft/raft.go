@@ -54,12 +54,20 @@ type Raft struct {
 	LastApplied int   // 已执行的日志(已提交的日志分为已执行和未执行)
 	NextIndex   []int // 发送到该服务器的下一个日志条目的索引
 	MatchIndex  []int // 已知的已经复制到该服务器的最高日志条目的索引
+
 	// 自定义状态
-	LastRPC time.Time // 接收心跳消息的时间
-	State   int       //确认是否为领导人
+	LastRPC   time.Time // 接收心跳消息的时间
+	State     int       //确认是否为领导人
+	LogLength int       //用变量维护日志长度
+
 	// 提供给应用的接口
 	ApplyCh   chan ApplyMsg
 	ApplyCond *sync.Cond
+
+	// 快照
+	SnapshotData      []byte
+	LastIncludedIndex int
+	LastIncludedTerm  int
 }
 
 // as each Raft peer becomes aware that successive log entries are
@@ -135,9 +143,6 @@ func (rf *Raft) GetState() (int, bool) {
 	return rf.CurrentTerm, rf.State == LEADER
 }
 
-// save Raft's persistent state to stable storage,
-// where it can later be retrieved after a crash and restart.
-// see paper's Figure 2 for a description of what should be persistent.
 // before you've implemented snapshots, you should pass nil as the
 // second argument to persister.Save().
 // after you've implemented snapshots, pass the current snapshot
@@ -145,14 +150,13 @@ func (rf *Raft) GetState() (int, bool) {
 //
 // 需要做持久化的状态: (1)CurrentTerm, (2)VotedFor, (3)Log
 func (rf *Raft) persist() {
-	// Your code here (3C).
-	// Example:
 	w := new(bytes.Buffer)
 	e := labgob.NewEncoder(w)
 	e.Encode(rf.CurrentTerm)
 	e.Encode(rf.VotedFor)
 	e.Encode(rf.Log)
 	raftstate := w.Bytes()
+
 	rf.persister.Save(raftstate, nil)
 }
 
@@ -161,8 +165,7 @@ func (rf *Raft) readPersist(data []byte) {
 	if data == nil || len(data) < 1 { // bootstrap without any state?
 		return
 	}
-	// Your code here (3C).
-	// Example:
+
 	r := bytes.NewBuffer(data)
 	d := labgob.NewDecoder(r)
 	var CurrentTerm int
@@ -187,6 +190,11 @@ func (rf *Raft) readPersist(data []byte) {
 // that index. Raft should now trim its log as much as possible.
 func (rf *Raft) Snapshot(index int, snapshot []byte) {
 	// Your code here (3D).
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	// 截断日志
+	copy(rf.Log, rf.Log[index:])
 }
 
 //************************************************************************************
@@ -198,7 +206,12 @@ func (rf *Raft) SendRPC(to int, rpc string, args interface{}, reply interface{})
 	return rf.peers[to].Call("Raft."+rpc, args, reply)
 }
 
-// 发起一轮领导人选举(按照论文的要求)
+// InstallSnapshot
+func (rf *Raft) InstallSnapshot() {
+
+}
+
+// 发起一轮领导人选举
 //
 // 1: 自增任期号
 //
@@ -206,7 +219,7 @@ func (rf *Raft) SendRPC(to int, rpc string, args interface{}, reply interface{})
 //
 // 3: 刷新计时器
 //
-// 4: 发送RequestVote RPCs给其他服务器
+// 4: 调用SendElection并行发送RequestVote RPCs给其他服务器
 //
 // 调用前不持有锁 rf.mu
 func (rf *Raft) BeginElection() {
@@ -277,19 +290,19 @@ func (rf *Raft) SendElection(to int, args RequestVoteArgs, vote *uint32) {
 	rf.mu.Unlock()
 
 	// 2:
-	// 2-1: 原子修改得票数
-	// 2-2: 获得大多数服务器投票, 当选leader
 	if reply.VoteGranted {
-		// 2-1:
+		// 得票
 		if v := atomic.AddUint32(vote, 1); v > (uint32(len(rf.peers) / 2)) {
+			// 当选leader
 			if DEBUG_Vote {
 				DPrintf("[VOTE-%d] p%d(%v,%d): Got %d votes\n",
 					args.Term, rf.me, STATE[rf.State], rf.CurrentTerm, *vote)
 			}
 
 			rf.mu.Lock()
-			// 2-2:
+
 			rf.State = LEADER
+			// 初始化MatchIndex和NextIndex
 			for i := range rf.peers {
 				if i >= len(rf.NextIndex) {
 					rf.NextIndex = append(rf.NextIndex, len(rf.Log))
@@ -302,11 +315,13 @@ func (rf *Raft) SendElection(to int, args RequestVoteArgs, vote *uint32) {
 					rf.MatchIndex[i] = -1
 				}
 			}
+
 			if DEBUG_Info {
 				DPrintf("[Info] p%d(%v,%d) \"CMIT(%d) APLY(%d) LogLen=%d, log[last]=%v NextIndex:%v MatchIndex:%v\"",
 					rf.me, STATE[rf.State], rf.CurrentTerm, rf.CommitIndex,
 					rf.LastApplied, len(rf.Log), rf.Log[len(rf.Log)-1], rf.NextIndex, rf.MatchIndex)
 			}
+			// 发一轮心跳宣言自己的身份
 			go rf.HeartBeatLauncher()
 
 		}
@@ -408,8 +423,10 @@ func (rf *Raft) HeartBeatLauncher() {
 		if i == rf.me {
 			continue
 		}
+
 		PrevLogIndex[i] = rf.NextIndex[i] - 1
 		PrevLogTerm[i] = rf.Log[rf.NextIndex[i]-1].LogTerm
+
 		// 根据日志长度和nextIndex来决定是否附加日志
 		if len(rf.Log) >= rf.NextIndex[i]+1 {
 			Entries[i] = make([]Log, len(rf.Log[rf.NextIndex[i]:]))
@@ -602,6 +619,7 @@ func (rf *Raft) HeartbeatHandler(args *AppendEntriesArgs, reply *AppendEntriesRe
 
 		// 在网络有故障时要注意这里
 		rf.Log = append(rf.Log[:index], args.Entries...)
+		rf.LogLength = len(rf.Log)
 		rf.persist() // 持久化
 	}
 
@@ -622,10 +640,10 @@ func (rf *Raft) HeartbeatHandler(args *AppendEntriesArgs, reply *AppendEntriesRe
 	}
 }
 
-// 接收客户端请求
+// Client sent request to leader by this func: Client-->Leader
 //
-// 1: 追加到leadr自己的Log中
-// 2: 向其他服务器发送AppendEntries消息
+// 1: append to Leader's Log
+// 2: Leader send this log entries
 func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
@@ -633,10 +651,13 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	if rf.State != LEADER {
 		return -1, -1, false
 	}
+
 	// 1:
 	entry := Log{LogTerm: rf.CurrentTerm, Command: command}
 	rf.Log = append(rf.Log, entry)
-	rf.persist() // 持久化
+	rf.LogLength++
+
+	rf.persist() // persist
 
 	if DEBUG_Aped {
 		DPrintf("[Start] p%d(%v,%d) \"Add Log:%v\"\n", rf.me, STATE[rf.State], rf.CurrentTerm, entry)
@@ -644,6 +665,10 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 
 	return len(rf.Log) - 1, rf.CurrentTerm, true
 }
+
+//************************************************************************************
+// Kill
+//************************************************************************************
 
 func (rf *Raft) Kill() {
 	//DPrintf("p%d was killed\n", rf.me)
@@ -655,6 +680,10 @@ func (rf *Raft) killed() bool {
 	z := atomic.LoadInt32(&rf.dead)
 	return z == 1
 }
+
+//************************************************************************************
+// Goroutine
+//************************************************************************************
 
 // Election线程
 //
@@ -749,14 +778,16 @@ func Make(peers []*labrpc.ClientEnd, me int,
 		NextIndex:  make([]int, 0),
 		Log:        make([]Log, 0),
 
-		State:   FOLLOWER,
-		ApplyCh: applyCh,
+		State:     FOLLOWER,
+		ApplyCh:   applyCh,
+		LogLength: 0,
 	}
 
 	rf.ApplyCond = sync.NewCond(&rf.mu)
 
 	// 不知道为什么测试的下标从1开始, 那第一个就刚好拿来做初始化
 	rf.Log = append(rf.Log, Log{0, 0})
+	rf.LogLength++
 
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())

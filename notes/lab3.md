@@ -152,3 +152,25 @@ type ApplyMsg struct {
 发送快照的时候需要把`ApplyMsg.CommandValid`设置为*false*表示这不是一个指令
 
 `Snapshot(index int, snapshot []byte)`, 第一个参数`index`表示快照蕴含的最高下标日志, *raft*应该删掉服务器中`index`之前的日志项.
+
+***算上快照后的日志下标计算偏移***
+
+现在的问题是, 在*raft*层的下标要怎么处理, 我们可在这层之间的计算都使用截断*Log*后的下标, 也就是虚假下标, 然后涉及到下标的比较的时候, 我们多传入参数`LastIndex`和`LastTerm`: 
+
+*leader*传入$LastIndex_{leader}$, $LastTerm_{leader}$, 以及当前日志中的下标$index_{leader}$, 与*follower*进行比较, $LastIndex_{follower}$, $LastTerm_{follower}$, $index_{follower}$
+
+1. **leader的这条日志比follower的新:**
+
+$LastTerm_{leader}$ > $LastTerm_{follower}$;
+
+$LastTerm_{leader}$ == $LastTerm_{follower}$ && $LastIndex_{leader} + Index_{leader}$ >= $LastIndex_{follower} + Index_{follower}$
+
+2. **follower落后太多, 需要leader发送snapshot**
+
+$NextIndex$ 
+
+### snapshot后的index问题
+
+先收集所有需要转换的下标:
+
+- `Next`

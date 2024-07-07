@@ -25,11 +25,11 @@ const (
 	FOLLOWER  int = 0
 
 	// DEBUG
-	DEBUG           bool = true
-	DEBUG_Info      bool = true
-	DEBUG_Vote      bool = true
+	DEBUG           bool = false
+	DEBUG_Info      bool = false
+	DEBUG_Vote      bool = false
 	DEBUG_Heartbeat bool = false
-	DEBUG_Aped      bool = true
+	DEBUG_Aped      bool = false
 	DEBUG_VoteRpc   bool = false
 	DEBUG_HeartRpc  bool = false
 	DEBUG_ApedRpc   bool = false
@@ -129,6 +129,14 @@ type AppendEntriesReply struct {
 	XIndex int // 如果XTerm!=-1, 记录该任期第一个日志条目的下标
 }
 
+//************************************************************************************
+// Tools
+//************************************************************************************
+
+func (rf *Raft) GetIndex(index int) int {
+	return index - rf.LastIncludedIndex
+}
+
 func Min(a int, b int) int {
 	if a > b {
 		return b
@@ -155,33 +163,52 @@ func (rf *Raft) persist() {
 	e.Encode(rf.CurrentTerm)
 	e.Encode(rf.VotedFor)
 	e.Encode(rf.Log)
+	e.Encode(rf.LastIncludedIndex)
+	e.Encode(rf.LastIncludedTerm)
 	raftstate := w.Bytes()
 
-	rf.persister.Save(raftstate, nil)
+	rf.persister.Save(raftstate, rf.SnapshotData)
 }
 
 // restore previously persisted state.
-func (rf *Raft) readPersist(data []byte) {
-	if data == nil || len(data) < 1 { // bootstrap without any state?
+func (rf *Raft) readPersist(raftdata []byte, snapshot []byte) {
+
+	// read RaftState
+	if raftdata == nil || len(raftdata) < 1 { // bootstrap without any state?
 		return
 	}
 
-	r := bytes.NewBuffer(data)
+	r := bytes.NewBuffer(raftdata)
 	d := labgob.NewDecoder(r)
+
 	var CurrentTerm int
 	var VotedFor int
 	var Log []Log
-	if d.Decode(&CurrentTerm) != nil || d.Decode(&VotedFor) != nil ||
-		d.Decode(&Log) != nil {
-		if DEBUG_Persist {
-			DPrintf("[Persist] p%d readPersist failed\n", rf.me)
-		}
+	var LastIncludedIndex int
+	var LastIncludedTerm int
+
+	if d.Decode(&CurrentTerm) != nil ||
+		d.Decode(&VotedFor) != nil ||
+		d.Decode(&Log) != nil ||
+		d.Decode(&LastIncludedIndex) != nil ||
+		d.Decode(&LastIncludedTerm) != nil {
 		return
 	} else {
 		rf.CurrentTerm = CurrentTerm
 		rf.VotedFor = VotedFor
 		rf.Log = Log
+		rf.LogLength = len(Log)
+		rf.LastIncludedIndex = LastIncludedIndex
+		rf.LastIncludedTerm = LastIncludedTerm
 	}
+
+	//read Snapshot State
+
+	if snapshot == nil || len(snapshot) < 1 {
+		return
+	}
+
+	rf.SnapshotData = snapshot
 }
 
 // the service says it has created a snapshot that has
@@ -193,8 +220,17 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
+	// State machine传递的index是真实下标
+	rf.LastIncludedIndex = index
+	index = rf.GetIndex(index)
+	rf.LastIncludedTerm = rf.Log[index].LogTerm
+
 	// 截断日志
-	copy(rf.Log, rf.Log[index:])
+	rf.Log = rf.Log[index:]
+	rf.LogLength = len(rf.Log)
+	rf.SnapshotData = snapshot
+
+	rf.persist()
 }
 
 //************************************************************************************
@@ -238,8 +274,8 @@ func (rf *Raft) BeginElection() {
 	args := RequestVoteArgs{
 		Term:         rf.CurrentTerm,
 		CandidateId:  rf.me,
-		LastLogIndex: len(rf.Log) - 1,
-		LastLogTerm:  rf.Log[len(rf.Log)-1].LogTerm,
+		LastLogIndex: rf.LogLength - 1,
+		LastLogTerm:  rf.Log[rf.LogLength-1].LogTerm,
 	}
 
 	if DEBUG_Vote {
@@ -305,9 +341,9 @@ func (rf *Raft) SendElection(to int, args RequestVoteArgs, vote *uint32) {
 			// 初始化MatchIndex和NextIndex
 			for i := range rf.peers {
 				if i >= len(rf.NextIndex) {
-					rf.NextIndex = append(rf.NextIndex, len(rf.Log))
+					rf.NextIndex = append(rf.NextIndex, rf.LogLength)
 				} else {
-					rf.NextIndex[i] = len(rf.Log)
+					rf.NextIndex[i] = rf.LogLength // NextIndex记录的虚假下标
 				}
 				if i >= len(rf.MatchIndex) {
 					rf.MatchIndex = append(rf.MatchIndex, -1)
@@ -319,7 +355,7 @@ func (rf *Raft) SendElection(to int, args RequestVoteArgs, vote *uint32) {
 			if DEBUG_Info {
 				DPrintf("[Info] p%d(%v,%d) \"CMIT(%d) APLY(%d) LogLen=%d, log[last]=%v NextIndex:%v MatchIndex:%v\"",
 					rf.me, STATE[rf.State], rf.CurrentTerm, rf.CommitIndex,
-					rf.LastApplied, len(rf.Log), rf.Log[len(rf.Log)-1], rf.NextIndex, rf.MatchIndex)
+					rf.LastApplied, rf.LogLength, rf.Log[rf.LogLength-1], rf.NextIndex, rf.MatchIndex)
 			}
 			// 发一轮心跳宣言自己的身份
 			go rf.HeartBeatLauncher()
@@ -373,9 +409,9 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 
 	// 较新的日志: (最后一个条目任期更大) || (最后一个条目任期相同&&下标更大)
 	//3: 候选人日志不如自己新
-	if !((args.LastLogTerm > rf.Log[len(rf.Log)-1].LogTerm) ||
-		(args.LastLogTerm == rf.Log[len(rf.Log)-1].LogTerm &&
-			args.LastLogIndex >= len(rf.Log)-1)) {
+	if !((args.LastLogTerm > rf.Log[rf.LogLength-1].LogTerm) ||
+		(args.LastLogTerm == rf.Log[rf.LogLength-1].LogTerm &&
+			args.LastLogIndex >= rf.LogLength-1)) {
 		reason += 1 << 3
 	}
 
@@ -428,13 +464,13 @@ func (rf *Raft) HeartBeatLauncher() {
 		PrevLogTerm[i] = rf.Log[rf.NextIndex[i]-1].LogTerm
 
 		// 根据日志长度和nextIndex来决定是否附加日志
-		if len(rf.Log) >= rf.NextIndex[i]+1 {
+		if rf.LogLength >= rf.NextIndex[i]+1 {
 			Entries[i] = make([]Log, len(rf.Log[rf.NextIndex[i]:]))
 			copy(Entries[i], rf.Log[rf.NextIndex[i]:])
 
 			if DEBUG_Aped {
 				DPrintf("[APED] p%d(%v,%d)->p%d \"Aped Log[%d~%d]\"\n",
-					rf.me, STATE[rf.State], rf.CurrentTerm, i, rf.NextIndex[i], len(rf.Log)-1)
+					rf.me, STATE[rf.State], rf.CurrentTerm, i, rf.NextIndex[i], rf.LogLength-1)
 			}
 
 		} else { // 仅仅是心跳包
@@ -503,7 +539,7 @@ func (rf *Raft) SendHeartbeat(to int, args AppendEntriesArgs) {
 
 		// 更新rf.CommitIndex = N(大多数服务器持有, 且任期等于当前任期的日志下标)
 		if len(args.Entries) != 0 {
-			for N := len(rf.Log) - 1; N > rf.CommitIndex; N-- {
+			for N := rf.LogLength - 1; N > rf.CommitIndex; N-- {
 				count := 0 // 统计"大多数"
 				for j := range rf.MatchIndex {
 					if j == rf.me || (rf.MatchIndex[j] >= N && rf.Log[N].LogTerm == rf.CurrentTerm) {
@@ -585,9 +621,9 @@ func (rf *Raft) HeartbeatHandler(args *AppendEntriesArgs, reply *AppendEntriesRe
 	rf.LastRPC = time.Now()
 
 	// 2a: 被检查日志条目不存在
-	if args.PrevLogIndex > len(rf.Log)-1 {
+	if args.PrevLogIndex > rf.LogLength-1 {
 		reply.XTerm = -1
-		reply.XLen = len(rf.Log)
+		reply.XLen = rf.LogLength
 		reply.Success = false
 		return
 	}
@@ -604,6 +640,7 @@ func (rf *Raft) HeartbeatHandler(args *AppendEntriesArgs, reply *AppendEntriesRe
 		reply.Success = false
 		// 删除包括该冲突日志在内的后续所有日志
 		rf.Log = rf.Log[:args.PrevLogIndex]
+		rf.LogLength = len(rf.Log)
 		return
 	}
 
@@ -632,9 +669,9 @@ func (rf *Raft) HeartbeatHandler(args *AppendEntriesArgs, reply *AppendEntriesRe
 	if args.LeaderCommit > rf.CommitIndex {
 		if DEBUG_Aped {
 			DPrintf("[CMIT] p%d(%v,%d) \"CMIT(%d->%d)\"\n",
-				rf.me, STATE[rf.State], rf.CurrentTerm, rf.CommitIndex, Min(args.LeaderCommit, len(rf.Log)-1))
+				rf.me, STATE[rf.State], rf.CurrentTerm, rf.CommitIndex, Min(args.LeaderCommit, rf.LogLength-1))
 		}
-		rf.CommitIndex = Min(args.LeaderCommit, len(rf.Log)-1)
+		rf.CommitIndex = Min(args.LeaderCommit, rf.LogLength-1)
 		rf.ApplyCond.Broadcast()
 		return
 	}
@@ -663,7 +700,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 		DPrintf("[Start] p%d(%v,%d) \"Add Log:%v\"\n", rf.me, STATE[rf.State], rf.CurrentTerm, entry)
 	}
 
-	return len(rf.Log) - 1, rf.CurrentTerm, true
+	return rf.LogLength - 1, rf.CurrentTerm, true
 }
 
 //************************************************************************************
@@ -714,7 +751,7 @@ func (rf *Raft) HeartBeatGoroutine(heartTime int) {
 		if cnt%5 == 0 && DEBUG_Info {
 			DPrintf("[Info] p%d(%v,%d) \"CMIT(%d) APLY(%d) LogLen=%d log[last]=%v NextIndex:%v MatchIndex:%v\"",
 				rf.me, STATE[rf.State], rf.CurrentTerm, rf.CommitIndex,
-				rf.LastApplied, len(rf.Log), rf.Log[len(rf.Log)-1], rf.NextIndex, rf.MatchIndex)
+				rf.LastApplied, rf.LogLength, rf.Log[rf.LogLength-1], rf.NextIndex, rf.MatchIndex)
 		}
 
 		if rf.State == LEADER {
@@ -738,9 +775,10 @@ func (rf *Raft) ApplyGoroutine() {
 		if rf.CommitIndex > rf.LastApplied {
 			rf.LastApplied++
 			msg := ApplyMsg{
-				Command:      rf.Log[rf.LastApplied].Command,
-				CommandIndex: rf.LastApplied,
-				CommandValid: true,
+				Command:       rf.Log[rf.LastApplied].Command,
+				CommandIndex:  rf.LastApplied,
+				CommandValid:  true,
+				SnapshotValid: false,
 			}
 
 			if DEBUG_Aped {
@@ -781,16 +819,19 @@ func Make(peers []*labrpc.ClientEnd, me int,
 		State:     FOLLOWER,
 		ApplyCh:   applyCh,
 		LogLength: 0,
+
+		SnapshotData:      nil,
+		LastIncludedIndex: 0,
+		LastIncludedTerm:  0,
 	}
 
 	rf.ApplyCond = sync.NewCond(&rf.mu)
 
-	// 不知道为什么测试的下标从1开始, 那第一个就刚好拿来做初始化
 	rf.Log = append(rf.Log, Log{0, 0})
-	rf.LogLength++
+	rf.LogLength = 1
 
 	// initialize from state persisted before a crash
-	rf.readPersist(persister.ReadRaftState())
+	rf.readPersist(persister.ReadRaftState(), persister.ReadSnapshot())
 
 	// 心跳线程
 	go rf.HeartBeatGoroutine(75)

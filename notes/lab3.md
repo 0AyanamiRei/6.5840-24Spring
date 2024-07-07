@@ -206,3 +206,16 @@ leader当选后设置`NextIndex=len(rf.Log) =4`, 一致性检查的日志项为�
 - 显然第一轮一致性检查不会通过, (2a)被检查的日志条目不存在: `args.PrevLogIndex + args.LastIndex > rf.LogLength - 1 (7>1)`, *fast backup*优化中, 要求返回`XLen = rf.LogLength (2)`, 显然不足以和另一个对比版本的情况区分开, 返回`XLen = rf.LogLength + rf.LastIndex (2)`, 另一个版本则返回4+2=6, 显然, 我们可以根据领导人自己的`LastIndex`来区分, `XLen < LastIndex`则发*snapshot*
 - 另一个对比版本, 领导人原有处理是`rf.NextIndex[to] = reply.XLen`, 因为这个方案下记录的都是虚拟地址, 所以减去`rf.LastIndex=4`即可, 下一次一致性检查就会通过.
 
+显然`Snapshot`中的参数`index`是由上层`State Machine`传入的, 是全局索引.
+
+`BeginElection()`中传入参数`args.LastLogIndex`由`rf.LogLength`传入, 所以是虚拟索引, 同时需要注意, `Log[0]`实际上保留的	`LastLog`, 所以当`rf.LogLength=1`的时候, 这里一致性检查的`LastLogTerm`是正确的
+
+`SendElection()`中当选领导人后对`NextIndex`的初始化也是通过`rf.LogLength`, 故也是虚拟索引
+
+`RequestVote()`里涉及到了新旧日志比较, 到这里我才意识到, 上面讨论的那个问题, 对于所有涉及日志比较的情况都需要讨论, 如果我们仅仅用虚拟索引去进行比较, 当某个服务器太过落后, 导致*snapshot*不同, 但是虚拟索引更大, 显得更新则会出现问题
+
+```
+leader: LastIndex=4, log[0], log[1] (term=4)
+
+follwer: LastIndex=0, log[0], log[1], log[2] (term=4)
+```

@@ -220,10 +220,9 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 
-	// State machine传递的index是真实下标
+	// State machine传递的index是全局索引, 需要转换一下
+	rf.LastIncludedTerm = rf.Log[rf.GetIndex(index)].LogTerm
 	rf.LastIncludedIndex = index
-	index = rf.GetIndex(index)
-	rf.LastIncludedTerm = rf.Log[index].LogTerm
 
 	// 截断日志
 	rf.Log = rf.Log[index:]
@@ -275,7 +274,8 @@ func (rf *Raft) BeginElection() {
 		Term:         rf.CurrentTerm,
 		CandidateId:  rf.me,
 		LastLogIndex: rf.LogLength - 1,
-		LastLogTerm:  rf.Log[rf.LogLength-1].LogTerm,
+		// rf.Log[0].LogTerm = rf.LastIncludedTerm
+		LastLogTerm: rf.Log[rf.LogLength-1].LogTerm,
 	}
 
 	if DEBUG_Vote {
@@ -343,7 +343,7 @@ func (rf *Raft) SendElection(to int, args RequestVoteArgs, vote *uint32) {
 				if i >= len(rf.NextIndex) {
 					rf.NextIndex = append(rf.NextIndex, rf.LogLength)
 				} else {
-					rf.NextIndex[i] = rf.LogLength // NextIndex记录的虚假下标
+					rf.NextIndex[i] = rf.LogLength // NextIndex记录的虚拟索引
 				}
 				if i >= len(rf.MatchIndex) {
 					rf.MatchIndex = append(rf.MatchIndex, -1)
@@ -402,7 +402,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 		reason += 1 << 1
 	}
 
-	//2: 已投票
+	//2: 已投票 (解释为什么要rf.VotedFor != args.CandidateId)
 	if rf.VotedFor != -1 && rf.VotedFor != args.CandidateId {
 		reason += 1 << 2
 	}

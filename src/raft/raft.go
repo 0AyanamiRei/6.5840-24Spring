@@ -464,7 +464,7 @@ func (rf *Raft) HeartBeatLauncher() {
 		PrevLogTerm[i] = rf.Log[rf.NextIndex[i]-1].LogTerm
 
 		// 根据日志长度和nextIndex来决定是否附加日志
-		if rf.LogLength >= rf.NextIndex[i]+1 {
+		if rf.LogLength > rf.NextIndex[i] {
 			Entries[i] = make([]Log, len(rf.Log[rf.NextIndex[i]:]))
 			copy(Entries[i], rf.Log[rf.NextIndex[i]:])
 

@@ -173,4 +173,36 @@ $NextIndex$
 
 先收集所有需要转换的下标:
 
-- `Next`
+- *Raft*层索引每个服务器的`rf.Log[index]`, `rf.Log[st:]`, `rf.Log[:ed]`
+- 服务器维护的日志长度`rf.LogLength`
+- *leader*为其他服务器维护的`rf.NextIndex[]`, `rf.MatchIndex[]`
+- 已提交/应用的下标`rf.CommitIndex`, `rf.LastApplied`
+- *RPCs*的参数, `RequestVoteArgs.LastLogIndex`, `AppendEntriesArgs.PrevLogIndex`, `AppendEntriesReply.XLen/XIndex`
+- 与其他层的接口, `ApplyMsg.CommandIndex`, `Start`的返回值, `Snapshot`的参数
+
+设计的时候, 还需要考虑到涉及到下标比较的时候要如何处理`什么时候leader需要发送snapshot`, `fast backup的一系列返回值内容, 以及一致性检查`
+
+```
+case1:
+leader: lastIndex = 4,  log[0], log[1], log[2], log[3]
+一个比较落后的follower:
+	follower: lastIndex = 0, log[0], log[1]
+一个对比的版本:
+	follower: lastIndex = 4, log[0], log[1]
+想一想, 怎么设计, followr返回什么信息才足够告诉leader需要发送snapshot
+```
+
+---
+
+让我们开始解决这个问题, 定义**虚拟索引**为做过日志压缩后的索引, **全局索引**为不使用Snapshot时的索引.
+
+先从解决实际问题开始比较好:
+
+1. *raft*层的所有索引都处理为虚拟索引
+
+leader当选后设置`NextIndex=len(rf.Log) =4`, 一致性检查的日志项为领导人中的`log[3]`.
+
+- 那么第一轮心跳消息不附带日志, 领导人需要发送`LastIndex=4`, `PrevLogIndex=3`
+- 显然第一轮一致性检查不会通过, (2a)被检查的日志条目不存在: `args.PrevLogIndex + args.LastIndex > rf.LogLength - 1 (7>1)`, *fast backup*优化中, 要求返回`XLen = rf.LogLength (2)`, 显然不足以和另一个对比版本的情况区分开, 返回`XLen = rf.LogLength + rf.LastIndex (2)`, 另一个版本则返回4+2=6, 显然, 我们可以根据领导人自己的`LastIndex`来区分, `XLen < LastIndex`则发*snapshot*
+- 另一个对比版本, 领导人原有处理是`rf.NextIndex[to] = reply.XLen`, 因为这个方案下记录的都是虚拟地址, 所以减去`rf.LastIndex=4`即可, 下一次一致性检查就会通过.
+

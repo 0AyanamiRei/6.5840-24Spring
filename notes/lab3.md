@@ -214,8 +214,79 @@ leader当选后设置`NextIndex=len(rf.Log) =4`, 一致性检查的日志项为�
 
 `RequestVote()`里涉及到了新旧日志比较, 到这里我才意识到, 上面讨论的那个问题, 对于所有涉及日志比较的情况都需要讨论, 如果我们仅仅用虚拟索引去进行比较, 当某个服务器太过落后, 导致*snapshot*不同, 但是虚拟索引更大, 显得更新则会出现问题
 
-```
-leader: LastIndex=4, log[0], log[1] (term=4)
+```go
+// leader: LastIndex=4, log[0], log[1] (term=4)
 
-follwer: LastIndex=0, log[0], log[1], log[2] (term=4)
+// follwer: LastIndex=0, log[0], log[1], log[2] (term=4)
+
+//
+args:= RequestVoteArgs{
+		LastLogIndex = rf.LogLength - 1 (= 1)
+		LastLogTerm = rf.Log[1].LogTerm (= 4) 
+}
+
+//3: 候选人日志不如自己新
+args.LastLogTerm (=4) == rf.Log[rf.LogLength-1].LogTerm (=4)
+args.LastLogIndex (=1) < rf.LogLength - 1 (=2)
+
+// 可以看见这里比较结果是候选人更旧
 ```
+
+上面的情况完全可能发生, 所以如果想要在*raft*层全部使用虚拟索引, 涉及到日期检查的rpc都需要领导人添加额外的信息, 至少需要`LastIndex`
+
+---
+
+不对, 发的时候就用全局索引就可以了, 然后比较的时候`rf.LogLength-1+rf.LastIncludedIndex`即可
+
+`HeartBeatLauncher()`中准备发心跳消息, `PrevLogIndex`是用的虚拟索引(`PrevLogIndex=PrevLogIndex[i] = rf.NextIndex[i] - 1`), 检查`HeartbeatHandler()`发现, 可以传全局索引`PrevLogIndex`的
+
+那么在`HeartbeatHandler()`中, 涉及到`PrevLogIndex`的比较, 都按全局索引比较即可, 这里涉及到*fast backup*, 所以详细解释代码:
+
+
+```go
+// 2a: 被检查日志条目不存在
+	//if条件按全局索引比较
+args.PrevLogIndex > rf.LogLength - 1 + rf.LastIncludedIndex
+	//reply.XLen应该返回全局索引: 
+reply.XLen = rf.LogLength + rf.LastIncludedIndex
+
+
+// 2b: 被检查日志条目任期冲突
+	//用leader的PrevLogIndex减去follower的LastIncludedIndex没有问题, 全局索引看来都是检查的同一条日志项
+args.PrevLogTerm != rf.Log[args.PrevLogIndex - rf.LastIncludedIndex].LogTerm
+
+// 删除包括该冲突日志在内的后续所有日志
+rf.Log = rf.Log[:args.PrevLogIndex - rf.LastIncludedIndex]
+
+// 附加了日志(这里通过了一致性检查+任期检查)
+index := globalOffset + 1
+rf.Log = append(rf.Log[:index], args.Entries...)
+
+// AppendEntries RPC的第五条建议 需要唤醒apply线程
+// rf.CommitIndex还是设置为全局索引比较好
+rf.CommitIndex = Min(args.LeaderCommit, rf.LogLength-1+rf.LastIncludedIndex)
+```
+
+ok,总结一下, 用于*fast backup*的三个参数都是全局索引, 记录已提交/应用的是全局索引.
+
+看如何通过这些参数在领导人这边修改数据:
+
+```go
+// 一致性检查+任期检查通过, NextIndex初始化的时候设置的是虚拟索引, 而rpc的参数PrevLogIndex是全局索引
+rf.MatchIndex[to] = args.PrevLogIndex + len(args.Entries) - rf.LastIncludedIndex
+
+rf.NextIndex[to] = rf.MatchIndex[to] + 1 
+// 所以NextIndex, MatchIndex是虚拟索引, 但是记得CommitIndex是全局
+
+// 一致性检查不通过
+// rf.Log本身就是虚拟的, 所以任期冲突的代码不修改
+
+// 尽管XLen的值涉及到不同服务器的LastIncludedIndex, 但全局的含义是一样的
+rf.NextIndex[to] = reply.XLen - rf.LastIncludedIndex
+```
+
+`Start()`中, 返回值是提供给上层函数, 所以必须是全局索引, `return rf.LogLength - 1 + rf.LastIncludedIndex`
+
+`ApplyGoroutine()`中, `CommitIndex`和`LastApplied`都当全局索引处理, 所以中途需要转换一下
+
+*ok*, 测试一下3B/3C: `python dtest.py 3B 3C TestSnapshotBasic3D -n 5 -v -p 10`

@@ -58,3 +58,5 @@ p2->p4 Log[11:]
 
 python dtest.py 3B TestPersist13C TestPersist23C TestPersist33C TestFigure83C -n 40 -v -p 20 
 python dtest.py 3A 3B TestPersist13C TestPersist23C TestPersist33C TestFigure83C -n 2000 -v -p 20
+
+python dtest.py 3B 3C -n 10 -v -p 10

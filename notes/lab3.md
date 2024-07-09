@@ -290,3 +290,28 @@ rf.NextIndex[to] = reply.XLen - rf.LastIncludedIndex
 `ApplyGoroutine()`中, `CommitIndex`和`LastApplied`都当全局索引处理, 所以中途需要转换一下
 
 *ok*, 测试一下3B/3C: `python dtest.py 3B 3C TestSnapshotBasic3D -n 5 -v -p 10`
+
+
+so, 当前的设置
+
+- 全局索引: `Snapshot(index int)`,  `args.PrevLogIndex`, `reply.XLen`, `rf.CommitIndex`, `reply.XIndex`, `Start()返回值`, `rf.LastApplied`, `args.LeaderCommit`
+- 虚拟索引: `args.LastLogIndex`, `rf.NextIndex[to]`, `rf.MatchIndex[to]`
+
+### 实现follower的InstallSnapshot函数
+
+1. 常规的RPC检测, 更新自己的任期
+2. 拒绝任期更小的leader的一切rpc消息
+3. 根据全局索引来比较, 如果自己的`Snapshot + rf.Log`覆盖了该rpc附带的`snapshot`, 那么就直接`return`
+4. rcp附带的`snapshot`更全, 那么截取所有其包含的日志信息
+5. 修改`CommitIndex`和`LastApplied`
+6. 应用`snapshot`
+
+### leader需要发送Snapshot的场景
+
+只要是涉及到leader给其他服务器追加日志的时候,就可能需要调用`SendSnapshot()`, 比如
+
+1. `reply.XLen - rf.LastIncludedIndex < 0`, 这种情况, follower的日志完全被领导人的snapshot覆盖, 同时修改`NextIndex[to]=1`
+2. `reply.XIndex - rf.LastIncludedIndex < 0`, 这种情况, follower多余的日志都是无用的, 等于被snapshot覆盖
+
+
+`python dtest.py TestSnapshotBasic3D TestSnapshotInstall3D TestSnapshotInstallUnreliable3D -n 20 -v -p 10`

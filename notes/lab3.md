@@ -315,3 +315,34 @@ so, 当前的设置
 
 
 `python dtest.py TestSnapshotBasic3D TestSnapshotInstall3D TestSnapshotInstallUnreliable3D -n 20 -v -p 10`
+
+---
+
+### 规范索引
+
+初次写完3D的代码后测试的结果很不理想, 代码逻辑也非常混乱, 故这里统一规定
+
+1. 借用操作系统的命令方式, 将全局的下标索引记为**虚拟索引**, 然后把`rf.Log[index]`实际使用的记为**物理索引**, 调用`V2PIndex(idx)`和`P2VIndex(idx)`来互相转换. 
+2. 同时规定, 关于索引, 记录的内容全部采取**虚拟索引**, 因为第一次写完我发现涉及到**下标比较**的时候, 都需要或者说使用全局的下标比较方便, 不过`rf.LogLenth`算一个例外, 因为直接写`=len(rf.Log)`比较简单, 不用再加一个值
+3. `LastIncludedTerm`使用`rf.Log[0]`记录, 这个位置的日志项我们没有使用.
+4. 日志信息中出现的所有下标直接展示的物理索引(不过列表的表示还是左闭右开), 然后紧跟一个括号表示虚拟索引, 表达日志的格式为`Log[1~a+b]`, 表示`LastIncludedIndex`为`a`, 然后整个日志的最后一个索引值是`a+b`(`LastIncludedIndex + LogLength`)
+
+### 调用InstallSnapshot的规则
+
+总的规则来说本质是一条: `当leader需要发给follower的日志项被snapshot截断, 那么leader需要发送snapshot给该follower`
+
+既然是需要发送日志项时才考虑, 那么我们可以直接在`HeartBeatLauncher()`中修改, 当需要发送的日志项索引`NextIndex[i]`已经被`snapshot`截断时,就改为发送`InstallSnapshot`.
+
+还有另一个地方可以发: `SendHeartbeat()`, 就是领导人发完心跳消息收到回复后会更新`NextIndex[i]`, 这个时候如果需要, 可以直接发快照, 我选择在后者发快照, 更具体一点, 仅当一致性检查不通过的时候, 我们需要发送快照.
+
+```go
+// 需要发送Snapshot
+if rf.NextIndex[to] <= rf.LastIncludedIndex {
+	rf.SendSnapshot(to) // (持有rf.mu)
+	rf.NextIndex[to] = rf.LastIncludedIndex + 1
+}
+```
+
+### BUG记录
+
+1. 报错的信息是`panic: runtime error: index out of range [-8]`, 出错的代码:`PrevLogTerm[i] = rf.Log[rf.V2PIndex(rf.NextIndex[i])-1].LogTerm`, 此时的`NextIndex: = [14 1 2]`, 分析结果是`p2`因为断连不跟领导人联系, 那么`NextIndex[2]`就一直保持了断开网络前的状态, 也就是2, 但此时领导人的`LastIncludedIndex`是9, 所以导致了这里索引为负值, 主要还是`NextIndex`不更新的原因, **为什么不检查出来就直接发snapshot呢?**

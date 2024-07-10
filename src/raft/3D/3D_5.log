@@ -1,0 +1,128 @@
+disconnect(0)
+disconnect(1)
+disconnect(2)
+connect(0)
+connect(1)
+connect(2)
+Test (3D): install snapshots (crash) ...
+907896  [VOTE-1] p1(F,1): Vote Start
+907896  [VOTE-1] p1(F,1)->p2 "Ask Vote"
+907896  [VOTE-1] p1(F,1)->p0 "Ask Vote"
+907896  [VOTE-1] p0(F,1)->p1 "OKKKK"
+907896  [VOTE-1] p2(F,1)->p1 "OKKKK"
+907896  [VOTE-1] p1(F,1): Got 2 votes
+907896  [VOTE-1] p1(L,1): Got 3 votes
+908232  [Start] p1(L,1) "Add Log:{1 5598304464448298079}"
+908740  [APED] p1(L,1)->p0 "Aped Log[1:2) (-0)"
+908740  [APED] p1(L,1)->p2 "Aped Log[1:2) (-0)"
+908740  [APED] p0(F,1) "CMIT(0) APLY(0) Add Log[0:1] log[last]:{1 5598304464448298079}"
+908740  [APED] p2(F,1) "CMIT(0) APLY(0) Add Log[0:1] log[last]:{1 5598304464448298079}"
+908740  [CMIT] p1(L,1) CMIT(0->1)
+908740  [APLY] p1(L,1) "CMIT(1) APLY(0+1) apply {1 5598304464448298079}"
+909251  [CMIT] p0(F,1) "CMIT(0->1)"
+909251  [CMIT] p2(F,1) "CMIT(0->1)"
+909251  [APLY] p0(F,1) "CMIT(1) APLY(0+1) apply {1 5598304464448298079}"
+909251  [APLY] p2(F,1) "CMIT(1) APLY(0+1) apply {1 5598304464448298079}"
+disconnect(2)
+914337  [Start] p1(L,1) "Add Log:{1 5453404507162734269}"
+914849  [APED] p1(L,1)->p0 "Aped Log[2:3) (-0)"
+914849  [APED] p1(L,1)->p2 "Aped Log[2:3) (-0)"
+914849  [APED] p0(F,1) "CMIT(1) APLY(1) Add Log[1:2] log[last]:{1 5453404507162734269}"
+914849  [CMIT] p1(L,1) CMIT(1->2)
+914849  [APLY] p1(L,1) "CMIT(2) APLY(1+1) apply {1 5453404507162734269}"
+915350  [APED] p1(L,1)->p2 "Aped Log[2:3) (-0)"
+915350  [CMIT] p0(F,1) "CMIT(1->2)"
+915350  [APLY] p0(F,1) "CMIT(2) APLY(1+1) apply {1 5453404507162734269}"
+915360  [Start] p1(L,1) "Add Log:{1 4368844690246248407}"
+915360  [Start] p1(L,1) "Add Log:{1 7085894346374565018}"
+915360  [Start] p1(L,1) "Add Log:{1 2376665291980923735}"
+915360  [Start] p1(L,1) "Add Log:{1 4283096128753905800}"
+915360  [Start] p1(L,1) "Add Log:{1 2008412349748126761}"
+915360  [Start] p1(L,1) "Add Log:{1 7074217227498044654}"
+915360  [Start] p1(L,1) "Add Log:{1 6078943944457459927}"
+915360  [Start] p1(L,1) "Add Log:{1 3721949014126397808}"
+915360  [Start] p1(L,1) "Add Log:{1 3383780273553699488}"
+915852  [APED] p1(L,1)->p0 "Aped Log[3:12) (-0)"
+915853  [APED] p1(L,1)->p2 "Aped Log[2:12) (-0)"
+915853  [APED] p0(F,1) "CMIT(2) APLY(2) Add Log[2:11] log[last]:{1 3383780273553699488}"
+915853  [CMIT] p1(L,1) CMIT(2->11)
+915853  [APLY] p1(L,1) "CMIT(11) APLY(2+1) apply {1 4368844690246248407}"
+915853  [APLY] p1(L,1) "CMIT(11) APLY(3+1) apply {1 7085894346374565018}"
+915853  [APLY] p1(L,1) "CMIT(11) APLY(4+1) apply {1 2376665291980923735}"
+915853  [APLY] p1(L,1) "CMIT(11) APLY(5+1) apply {1 4283096128753905800}"
+915853  [APLY] p1(L,1) "CMIT(11) APLY(6+1) apply {1 2008412349748126761}"
+915853  [APLY] p1(L,1) "CMIT(11) APLY(7+1) apply {1 7074217227498044654}"
+915853  [APLY] p1(L,1) "CMIT(11) APLY(8+1) apply {1 6078943944457459927}"
+915853  [APLY] p1(L,1) "CMIT(11) APLY(9+1) apply {1 3721949014126397808}"
+915853  [SNAP] p1(L,1)" log[0:9:12) LastInclude(idx:9,term:1)"
+915853  [APLY] p1(L,1) "CMIT(11) APLY(10+1) apply {1 3383780273553699488}"
+916361  [SNAP] p1(L,1)->p2 "SendSnapshot  snap(idx:9,term:1) NextIdx[2]=2->10"
+916361  [CMIT] p0(F,1) "CMIT(2->11)"
+916361  [APLY] p0(F,1) "CMIT(11) APLY(2+1) apply {1 4368844690246248407}"
+916361  [APLY] p0(F,1) "CMIT(11) APLY(3+1) apply {1 7085894346374565018}"
+916361  [APLY] p0(F,1) "CMIT(11) APLY(4+1) apply {1 2376665291980923735}"
+916361  [APLY] p0(F,1) "CMIT(11) APLY(5+1) apply {1 4283096128753905800}"
+916361  [APLY] p0(F,1) "CMIT(11) APLY(6+1) apply {1 2008412349748126761}"
+916361  [APLY] p0(F,1) "CMIT(11) APLY(7+1) apply {1 7074217227498044654}"
+916361  [APLY] p0(F,1) "CMIT(11) APLY(8+1) apply {1 6078943944457459927}"
+916361  [APLY] p0(F,1) "CMIT(11) APLY(9+1) apply {1 3721949014126397808}"
+916361  [SNAP] p0(F,1)" log[0:9:12) LastInclude(idx:9,term:1)"
+916361  [APLY] p0(F,1) "CMIT(11) APLY(10+1) apply {1 3383780273553699488}"
+disconnect(2)
+connect(2)
+916387  [Start] p1(L,1) "Add Log:{1 5121160224424604429}"
+916872  [APED] p1(L,1)->p0 "Aped Log[12:13) (-9)"
+916872  [SNAP] p1(L,1)->p2 "SendSnapshot  snap(idx:9,term:1) NextIdx[2]=2->10"
+916872  [APED] p0(F,1) "CMIT(11) APLY(11) Add Log[11:12] log[last]:{1 5121160224424604429}"
+916872  [SNAP] p2(F,1) "InstallSnap snap(idx:9,term:1) CMIT:9 APLY:9"
+916872  [CMIT] p1(L,1) CMIT(11->21)
+916872  [APLY] p1(L,1) "CMIT(12) APLY(11+1) apply {1 5121160224424604429}"
+917377  [APED] p1(L,1)->p2 "Aped Log[10:13) (-9)"
+917377  [CMIT] p0(F,1) "CMIT(11->12)"
+917377  [APED] p2(F,1) "CMIT(9) APLY(9) Add Log[9:12] log[last]:{1 5121160224424604429}"
+917377  [APLY] p0(F,1) "CMIT(12) APLY(11+1) apply {1 5121160224424604429}"
+917377  [CMIT] p2(F,1) "CMIT(9->12)"
+917377  [APLY] p2(F,1) "CMIT(12) APLY(9+1) apply {1 3721949014126397808}"
+917377  [APLY] p2(F,1) "CMIT(12) APLY(10+1) apply {1 3383780273553699488}"
+917377  [APLY] p2(F,1) "CMIT(12) APLY(11+1) apply {1 5121160224424604429}"
+disconnect(1)
+927693  [VOTE-2] p0(F,2): Vote Start
+927693  [VOTE-2] p0(F,2)->p2 "Ask Vote"
+927693  [VOTE-2] p0(F,2)->p1 "Ask Vote"
+927693  [VOTE-2] p2(F,2)->p0 "OKKKK"
+927693  [VOTE-2] p0(F,2): Got 2 votes
+927937  [Start] p0(L,2) "Add Log:{2 1241425167629441464}"
+927993  [APED] p0(L,2)->p1 "Aped Log[13:14) (-9)"
+927993  [APED] p0(L,2)->p2 "Aped Log[13:14) (-9)"
+927993  [APED] p2(F,2) "CMIT(12) APLY(12) Add Log[12:13] log[last]:{2 1241425167629441464}"
+927993  [CMIT] p0(L,2) CMIT(12->22)
+927993  [APLY] p0(L,2) "CMIT(13) APLY(12+1) apply {2 1241425167629441464}"
+928513  [APED] p0(L,2)->p1 "Aped Log[13:14) (-9)"
+928529  [CMIT] p2(F,2) "CMIT(12->13)"
+928529  [APLY] p2(F,2) "CMIT(13) APLY(12+1) apply {2 1241425167629441464}"
+928564  [Start] p0(L,2) "Add Log:{2 1858875517575692209}"
+929031  [APED] p0(L,2)->p1 "Aped Log[13:15) (-9)"
+929031  [APED] p0(L,2)->p2 "Aped Log[14:15) (-9)"
+929031  [APED] p2(F,2) "CMIT(13) APLY(13) Add Log[13:14] log[last]:{2 1858875517575692209}"
+929031  [CMIT] p0(L,2) CMIT(13->23)
+929031  [APLY] p0(L,2) "CMIT(14) APLY(13+1) apply {2 1858875517575692209}"
+929535  [APED] p0(L,2)->p1 "Aped Log[13:15) (-9)"
+929535  [CMIT] p2(F,2) "CMIT(13->14)"
+929535  [APLY] p2(F,2) "CMIT(14) APLY(13+1) apply {2 1858875517575692209}"
+disconnect(1)
+connect(1)
+929628  [Start] p0(L,2) "Add Log:{2 2929176383922333149}"
+930046  [APED] p0(L,2)->p1 "Aped Log[13:16) (-9)"
+930047  [APED] p0(L,2)->p2 "Aped Log[15:16) (-9)"
+930047  [APED] p1(F,2) "CMIT(0) APLY(0) Add Log[12:15] log[last]:{2 2929176383922333149}"
+930047  [APED] p2(F,2) "CMIT(14) APLY(14) Add Log[14:15] log[last]:{2 2929176383922333149}"
+930047  [CMIT] p1(F,2) "CMIT(0->14)"
+panic: runtime error: index out of range [-8]
+
+goroutine 11695 [running]:
+6.5840/raft.(*Raft).ApplyGoroutine(0xc0004ea700)
+	D:/Project/6828/6.5840-24Spring/src/raft/raft.go:973 +0x329
+created by 6.5840/raft.Make in goroutine 11470
+	D:/Project/6828/6.5840-24Spring/src/raft/raft.go:1036 +0x327
+exit status 2
+FAIL	6.5840/raft	93.443s

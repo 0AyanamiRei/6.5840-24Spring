@@ -314,6 +314,8 @@ so, 当前的设置
 2. `reply.XIndex - rf.LastIncludedIndex < 0`, 这种情况, follower多余的日志都是无用的, 等于被snapshot覆盖
 
 
+`python dtest.py TestSnapshotBasic3D TestSnapshotInstall3D -n 20 -v -p 10`
+
 `python dtest.py TestSnapshotBasic3D TestSnapshotInstall3D TestSnapshotInstallUnreliable3D -n 20 -v -p 10`
 
 ---
@@ -327,22 +329,31 @@ so, 当前的设置
 3. `LastIncludedTerm`使用`rf.Log[0]`记录, 这个位置的日志项我们没有使用.
 4. 日志信息中出现的所有下标直接展示的物理索引(不过列表的表示还是左闭右开), 然后紧跟一个括号表示虚拟索引, 表达日志的格式为`Log[1~a+b]`, 表示`LastIncludedIndex`为`a`, 然后整个日志的最后一个索引值是`a+b`(`LastIncludedIndex + LogLength`)
 
-### 调用InstallSnapshot的规则
+### InstallSnapshot
 
-总的规则来说本质是一条: `当leader需要发给follower的日志项被snapshot截断, 那么leader需要发送snapshot给该follower`
+久经折磨, 终究还是一字一句的遵守论文中图13已经图8的指示:
 
-既然是需要发送日志项时才考虑, 那么我们可以直接在`HeartBeatLauncher()`中修改, 当需要发送的日志项索引`NextIndex[i]`已经被`snapshot`截断时,就改为发送`InstallSnapshot`.
+1. `Reply immediately if term < currentTerm`, 常规的rpc处理程序检查
+2. 更新自己的计时器
+3. `If existing log entry has same index and term as snapshot's last included entry, retain log entries following it and reply`, 这句话的意思是从现有的日志中找到这样一个匹配的日志项, 其实就是确认快照的最后一个日志项是否在自己的日志中能找到
+4. 将快照应用到上层状态机, 并且修改自己的配置参数
 
-还有另一个地方可以发: `SendHeartbeat()`, 就是领导人发完心跳消息收到回复后会更新`NextIndex[i]`, 这个时候如果需要, 可以直接发快照, 我选择在后者发快照, 更具体一点, 仅当一致性检查不通过的时候, 我们需要发送快照.
+### 发送快照的时机
 
-```go
-// 需要发送Snapshot
-if rf.NextIndex[to] <= rf.LastIncludedIndex {
-	rf.SendSnapshot(to) // (持有rf.mu)
-	rf.NextIndex[to] = rf.LastIncludedIndex + 1
-}
-```
+简单来说, 我觉得只要涉及到领导人自身日志项的环节就都有可能出现, 待使用日志被快照覆盖, 从而导致无法在现有日志中找到. 
+
+不过先想好什么时候要发快照, 当访问日志`rf.Log[index]`出错的时候, 即`index < 0`, 同时, 如果是要附加日志内容, 那么这里应该是`index <= 0`, 因为第零项没有实质内容
+
+在我设计里, 以及通过前面的经验, 我应该关注下面两个过程;
+
+1. `HeartBeatLauncher()` 心跳发射器为其余服务器的`args`发送rpc考虑是否需要附带日志项的时候
+2. `SendHeartbeat()` 心跳发射函数, 收到`reply`后需要修改`NextIndex`, 这个时候如果我们发现需要退回的日志已经在快照中, 就可以直接发快照
+
+### 其他内容
+
+还需要进行修改的就是当一致性检查的日志是`PrevLogIndex=0`时, 因为暂时不确定`rf.Log[0]`的任期就是快照的最后一个日志项任期, 所以还是用`rf.LastIncludedTerm`来进行检查
 
 ### BUG记录
 
 1. 报错的信息是`panic: runtime error: index out of range [-8]`, 出错的代码:`PrevLogTerm[i] = rf.Log[rf.V2PIndex(rf.NextIndex[i])-1].LogTerm`, 此时的`NextIndex: = [14 1 2]`, 分析结果是`p2`因为断连不跟领导人联系, 那么`NextIndex[2]`就一直保持了断开网络前的状态, 也就是2, 但此时领导人的`LastIncludedIndex`是9, 所以导致了这里索引为负值, 主要还是`NextIndex`不更新的原因, **为什么不检查出来就直接发snapshot呢?**
+2. 一旦领导人在失联的服务器重连回来并发起投票的时候, 也就是说暂时d领导人收到

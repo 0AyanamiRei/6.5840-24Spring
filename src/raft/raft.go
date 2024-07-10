@@ -26,8 +26,8 @@ const (
 
 	// DEBUG
 	DEBUG           bool = false
-	DEBUG_Info      bool = true
-	DEBUG_Vote      bool = false
+	DEBUG_Info      bool = false
+	DEBUG_Vote      bool = true
 	DEBUG_Heartbeat bool = false
 	DEBUG_Aped      bool = true
 	DEBUG_VoteRpc   bool = false
@@ -178,12 +178,9 @@ func (rf *Raft) GetState() (int, bool) {
 	return rf.CurrentTerm, rf.State == LEADER
 }
 
-// before you've implemented snapshots, you should pass nil as the
-// second argument to persister.Save().
-// after you've implemented snapshots, pass the current snapshot
-// (or nil if there's not yet a snapshot).
+// 调用前需持有锁rf.mu
 //
-// 需要做持久化的状态: (1)CurrentTerm, (2)VotedFor, (3)Log
+//	需要做持久化的状态: (1)CurrentTerm, (2)VotedFor, (3)Log
 func (rf *Raft) persist() {
 	w := new(bytes.Buffer)
 	e := labgob.NewEncoder(w)
@@ -237,6 +234,8 @@ func (rf *Raft) readPersist(raftdata []byte, snapshot []byte) {
 	rf.SnapshotData = snapshot
 }
 
+// 调用前不持有锁rf.mu, 调用后也不持有锁rf.mu
+//
 // 提供给上层的接口
 func (rf *Raft) Snapshot(index int, snapshot []byte) {
 	// Your code here (3D).
@@ -252,7 +251,9 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 	rf.SnapshotData = snapshot
 
 	if DEBUG_Snap {
-		DPrintf("[SNAP] \" DEBUG\"\n")
+		DPrintf("[SNAP] p%d(%v,%d)\" log[0:%d:%d) LastInclude(idx:%d,term:%d)\"\n", rf.me, STATE[rf.State], rf.CurrentTerm,
+			rf.LastIncludedIndex, rf.LogLength,
+			rf.LastIncludedIndex, rf.LastIncludedTerm)
 	}
 
 	rf.persist()
@@ -269,150 +270,109 @@ func (rf *Raft) SendRPC(to int, rpc string, args interface{}, reply interface{})
 
 // leader发送快照给peers[to]
 //
-// 调用前已持有rf.mu
-func (rf *Raft) SendSnapshot(to int) {
-	args := SnapshotArgs{
-		Term:              rf.CurrentTerm,
-		LeaderId:          rf.me,
-		LastIncludedIndex: rf.LastIncludedIndex,
-		LastIncludedTerm:  rf.LastIncludedTerm,
-		Snapdata:          rf.SnapshotData,
-	}
-
+// 调用前不持有rf.mu, 调用后也不持有rf.mu
+func (rf *Raft) SendSnapshot(to int, args SnapshotArgs) {
 	reply := SnapshotRelpay{}
 
-	rf.mu.Unlock() //先释放资源, 再发rpc进入等待
+	if DEBUG_Snap {
+		DPrintf("[SNAP] p%d(%v,%d)->p%d \"SendSnapshot  snap(idx:%d,term:%d) NextIdx[%d]=%d->%d\"\n",
+			rf.me, STATE[rf.State], rf.CurrentTerm, to,
+			rf.LastIncludedIndex, rf.LastIncludedTerm,
+			to, rf.NextIndex[to], rf.LastIncludedIndex+1)
+	}
+
 	if !rf.SendRPC(to, "InstallSnapshot", &args, &reply) {
-		rf.mu.Lock()
 		return
 	}
+
 	rf.mu.Lock()
+
+	//rpc回复过期
+	if rf.CurrentTerm != args.Term {
+		rf.mu.Unlock()
+		return
+	}
 
 	// 任期检查
 	if reply.Term > rf.CurrentTerm {
 		rf.State = FOLLOWER
+		//rf.VotedFor = -1
 		rf.CurrentTerm = reply.Term
 
 		rf.persist()
 	}
 
-	if DEBUG_Snap {
-		DPrintf("[SNAP] \"DEBUG\"\n")
-	}
-
 	rf.NextIndex[to] = rf.LastIncludedIndex + 1
-
+	rf.mu.Unlock()
 }
 
 // 快照处理程序
 //
-// 0: rpc常规检测: 一般发snap的都会更新任期
+// 1: rpc任期检查
 //
-// 1: leader任期落后
+// 2: 更新计时器
 //
-// 2: 根据LastIncludedIndex决定
-// 2a: 丢弃此次快照
-// 2b: 快照蕴含了全部日志, 丢弃所有日志
-// 2c: 快照蕴含了日志的前缀信息, 截断日志
+// 3: 更新日志项
 //
-// 注: 这里应该通过LastIncluded的日志项
+// 4: 修改自身配置项, 应用快照
 //
 // 调用前无锁 rf.mu, 调用后也不持有锁 rf.mu
 func (rf *Raft) InstallSnapshot(args *SnapshotArgs, reply *SnapshotRelpay) {
 	rf.mu.Lock()
+	defer rf.mu.Unlock()
 
 	reply.Term = rf.CurrentTerm
 
-	// 0: 更新自己的任期
+	// 1
+	if args.Term < rf.CurrentTerm {
+		return
+	}
+
 	if args.Term > rf.CurrentTerm {
 		rf.CurrentTerm = args.Term
-		rf.State = FOLLOWER // why need this?
+		rf.VotedFor = -1 // why this code??
+		rf.State = FOLLOWER
 	}
 
-	// 1: leader任期落后
-	if args.Term < rf.CurrentTerm {
-		rf.mu.Unlock()
-		return
-	}
-
-	// rpc需要重置自己的定时器
+	// 2
 	rf.LastRPC = time.Now()
 
-	// 2a: 丢掉此次快照
-	// 快照的最后一项都不如自己的新
-	if !(args.LastIncludedIndex > rf.LastIncludedIndex ||
-		(args.LastIncludedIndex == rf.LastIncludedIndex &&
-			args.LastIncludedTerm >= rf.LastIncludedTerm)) {
-		rf.mu.Unlock()
-		return
-	}
-
-	// 2b: 快照蕴含了全部日志
-	// 说明lastIncluded的日志项比rf.Log中最后一项新
-	if args.LastIncludedIndex > rf.LogLength-1 ||
-		(args.LastIncludedIndex == rf.LogLength-1 &&
-			args.LastIncludedTerm >= rf.Log[rf.V2PIndex(rf.LogLength)-1].LogTerm) {
-		rf.LastIncludedIndex = args.LastIncludedIndex
-		rf.LastIncludedTerm = args.LastIncludedTerm
+	// 3
+	if rf.LastIncludedIndex <= args.LastIncludedIndex &&
+		args.LastIncludedIndex <= rf.LogLength-1 &&
+		rf.Log[rf.V2PIndex(args.LastIncludedIndex)].LogTerm == args.LastIncludedTerm {
+		rf.Log = rf.Log[rf.V2PIndex(args.LastIncludedIndex):]
+	} else {
 		rf.Log = make([]Log, 0)
 		rf.Log = append(rf.Log, Log{args.LastIncludedTerm, 0})
-		rf.LogLength = len(rf.Log) + args.LastIncludedIndex
-
-		rf.LastApplied = args.LastIncludedIndex
-		rf.CommitIndex = args.LastIncludedIndex
-
-		rf.persist()
-
-		// install snapshot
-		msg := ApplyMsg{
-			CommandValid:  false,
-			SnapshotValid: true,
-			Snapshot:      args.Snapdata,
-			SnapshotTerm:  args.LastIncludedTerm,
-			SnapshotIndex: args.LastIncludedIndex,
-		}
-
-		rf.mu.Unlock()
-		rf.ApplyCh <- msg
-		return
 	}
 
-	// 2c: 快照蕴含了日志的前缀信息
-	// 在不如rf.Log最后一项新的同时, 比服务器自己lastInlcude的新
-	if args.LastIncludedIndex > rf.LastIncludedIndex ||
-		(args.LastIncludedIndex == rf.LastIncludedIndex &&
-			args.LastIncludedTerm >= rf.LastIncludedTerm) {
+	// 4
+	rf.LastIncludedIndex = args.LastIncludedIndex
+	rf.LastIncludedTerm = args.LastIncludedTerm
+	rf.LastApplied = Max(rf.LastApplied, args.LastIncludedIndex)
+	rf.CommitIndex = Max(rf.CommitIndex, args.LastIncludedIndex)
+	rf.SnapshotData = args.Snapdata
+	rf.LogLength = len(rf.Log) + rf.LastIncludedIndex
 
-		index := rf.V2PIndex(args.LastIncludedIndex) // 保留的日志项
-		rf.Log = rf.Log[index:]
-		rf.Log[0].LogTerm = args.LastIncludedTerm
-		rf.LogLength = len(rf.Log) + args.LastIncludedIndex
-
-		rf.LastIncludedIndex = args.LastIncludedIndex
-		rf.LastIncludedTerm = args.LastIncludedTerm
-
-		rf.LastApplied = Max(args.LastIncludedIndex, rf.LastApplied)
-		rf.CommitIndex = Max(args.LastIncludedIndex, rf.CommitIndex)
-
-		rf.persist()
-
-		// install snapshot
-		msg := ApplyMsg{
-			CommandValid:  false,
-			SnapshotValid: true,
-			Snapshot:      args.Snapdata,
-			SnapshotTerm:  args.LastIncludedTerm,
-			SnapshotIndex: args.LastIncludedIndex,
-		}
-
-		rf.mu.Unlock()
-		rf.ApplyCh <- msg
-		return
+	msg := ApplyMsg{
+		SnapshotValid: true,
+		Snapshot:      args.Snapdata,
+		SnapshotTerm:  args.LastIncludedTerm,
+		SnapshotIndex: args.LastIncludedIndex,
 	}
+	rf.persist()
 
 	if DEBUG_Snap {
-		DPrintf("[SNAP] \"DEBUG\"\n")
+		DPrintf("[SNAP] p%d(%v,%d) \"InstallSnap snap(idx:%d,term:%d) CMIT:%d APLY:%d\"\n",
+			rf.me, STATE[rf.State], rf.CurrentTerm,
+			rf.LastIncludedIndex, rf.LastIncludedTerm,
+			rf.CommitIndex, rf.LastApplied)
 	}
+
+	rf.mu.Unlock()
+	rf.ApplyCh <- msg
+	rf.mu.Lock()
 }
 
 // 发起一轮领导人选举
@@ -438,6 +398,12 @@ func (rf *Raft) BeginElection() {
 
 	// 3:
 	rf.LastRPC = time.Now()
+
+	if rf.V2PIndex(rf.LogLength)-1 < 0 {
+		DPrintf("[DEBUG] p%d(%v,%d) \"BeginElection snap(idx:%d,term:%d) LogLen:%d\"\n",
+			rf.me, STATE[rf.State], rf.CurrentTerm,
+			rf.LastIncludedIndex, rf.LastIncludedTerm, rf.LogLength)
+	}
 
 	args := RequestVoteArgs{
 		Term:         rf.CurrentTerm,
@@ -523,7 +489,7 @@ func (rf *Raft) SendElection(to int, args RequestVoteArgs, vote *uint32) {
 			if DEBUG_Info {
 				DPrintf("[Info] p%d(%v,%d) \"CMIT(%d) APLY(%d) LogLen=%d, log[last]=%v NextIndex:%v MatchIndex:%v\"",
 					rf.me, STATE[rf.State], rf.CurrentTerm, rf.CommitIndex,
-					rf.LastApplied, rf.LogLength, rf.Log[rf.LogLength-1], rf.NextIndex, rf.MatchIndex)
+					rf.LastApplied, rf.LogLength, rf.Log[rf.V2PIndex(rf.LogLength)-1], rf.NextIndex, rf.MatchIndex)
 			}
 			// 发一轮心跳宣言自己的身份
 			go rf.HeartBeatLauncher()
@@ -608,7 +574,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	}
 }
 
-// 心跳发送器
+// 心跳发射器
 //
 // 领导人组织好心跳包准备发送给其他服务器
 //
@@ -620,35 +586,39 @@ func (rf *Raft) HeartBeatLauncher() {
 	Term := rf.CurrentTerm
 	LeaderId := rf.me
 	LeaderCommit := rf.CommitIndex
+	LastIncludedIndex := rf.LastIncludedIndex
+	LastIncludedTerm := rf.LastIncludedTerm
 	PrevLogIndex := make([]int, len(rf.peers))
 	PrevLogTerm := make([]int, len(rf.peers))
 	Entries := make([][]Log, len(rf.peers))
+
 	for i := range rf.peers {
 		if i == rf.me {
 			continue
 		}
 
-		// 这里会出现Log[-1]的问题
 		PrevLogIndex[i] = rf.NextIndex[i] - 1
-		PrevLogTerm[i] = rf.Log[rf.V2PIndex(rf.NextIndex[i])-1].LogTerm
-
-		// 根据日志长度和nextIndex来决定是否附加日志
-		if rf.LogLength > rf.NextIndex[i] {
+		//允许等于0, rf.LastIncludedIndex/Term就是用于index=0时的一致性检查
+		if rf.V2PIndex(rf.NextIndex[i])-1 < 0 { // SendSnapshot
+			PrevLogTerm[i] = -1
+		} else if rf.LogLength > rf.NextIndex[i] { // 追加日志
+			PrevLogTerm[i] = rf.Log[rf.V2PIndex(rf.NextIndex[i])-1].LogTerm
 			Entries[i] = make([]Log, len(rf.Log[rf.V2PIndex(rf.NextIndex[i]):]))
 			copy(Entries[i], rf.Log[rf.V2PIndex(rf.NextIndex[i]):])
-
 			if DEBUG_Aped {
-				DPrintf("[APED] p%d(%v,%d)->p%d \"Aped Log[%d:%d(+%d)]\"\n",
-					rf.me, STATE[rf.State], rf.CurrentTerm, i, rf.NextIndex[i], rf.LogLength, rf.LastIncludedIndex)
+				DPrintf("[APED] p%d(%v,%d)->p%d \"Aped Log[%d:%d) (-%d)\"\n",
+					rf.me, STATE[rf.State], rf.CurrentTerm, i,
+					rf.NextIndex[i], rf.LogLength, rf.LastIncludedIndex)
 			}
-
-		} else { // 仅仅是心跳包
+		} else { // 心跳消息
+			PrevLogTerm[i] = rf.Log[rf.V2PIndex(rf.NextIndex[i])-1].LogTerm
 			Entries[i] = make([]Log, 0)
 			if DEBUG_Heartbeat {
 				DPrintf("[Heart(%d)] sent p%d(%s)->p%d\n", rf.CurrentTerm, rf.me, STATE[rf.State], i)
 			}
 		}
 	}
+
 	rf.mu.Unlock()
 
 	// 并发发送心跳&追加日志消息
@@ -656,15 +626,27 @@ func (rf *Raft) HeartBeatLauncher() {
 		if i == LeaderId {
 			continue
 		}
-		args := AppendEntriesArgs{
-			Term:         Term,
-			LeaderId:     LeaderId,
-			PrevLogIndex: PrevLogIndex[i],
-			PrevLogTerm:  PrevLogTerm[i],
-			LeaderCommit: LeaderCommit,
-			Entries:      Entries[i],
+
+		if PrevLogTerm[i] != -1 { // SendHeartbeat
+			args := AppendEntriesArgs{
+				Term:         Term,
+				LeaderId:     LeaderId,
+				PrevLogIndex: PrevLogIndex[i],
+				PrevLogTerm:  PrevLogTerm[i],
+				LeaderCommit: LeaderCommit,
+				Entries:      Entries[i],
+			}
+			go rf.SendHeartbeat(i, args)
+		} else {
+			args := SnapshotArgs{
+				Term:              Term,
+				LeaderId:          LeaderId,
+				LastIncludedIndex: LastIncludedIndex,
+				LastIncludedTerm:  LastIncludedTerm,
+				Snapdata:          rf.SnapshotData, // 不需要锁也行
+			}
+			go rf.SendSnapshot(i, args)
 		}
-		go rf.SendHeartbeat(i, args)
 	}
 }
 
@@ -753,9 +735,22 @@ func (rf *Raft) SendHeartbeat(to int, args AppendEntriesArgs) {
 		} else { // 检查日志不存在
 			rf.NextIndex[to] = reply.XLen
 		}
+		// 如果这里退回到的下标已经被快照覆盖, 那么发snapshot
+		// 但是其实也可以等下一轮心跳的
+		if rf.NextIndex[to] <= rf.LastIncludedIndex {
+			args := SnapshotArgs{
+				Term:              rf.CurrentTerm,
+				LeaderId:          rf.me,
+				LastIncludedIndex: rf.LastIncludedIndex,
+				LastIncludedTerm:  rf.LastIncludedTerm,
+				Snapdata:          rf.SnapshotData,
+			}
+			rf.mu.Unlock()
+			go rf.SendSnapshot(to, args)
+			return
+		}
 
 		rf.mu.Unlock()
-		return
 	}
 }
 
@@ -772,69 +767,88 @@ func (rf *Raft) HeartbeatHandler(args *AppendEntriesArgs, reply *AppendEntriesRe
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 	reply.Term = rf.CurrentTerm
+
 	// 0: 更新自己的任期
 	if args.Term > rf.CurrentTerm {
 		rf.CurrentTerm = args.Term
 		rf.State = FOLLOWER // why need this?
 		rf.persist()        // 持久化
 	}
+
 	// 1:领导人任期落后
 	if args.Term < rf.CurrentTerm {
 		reply.Success = false
+		if DEBUG_Aped {
+			DPrintf("[TEMP] p%d(%v,%d) \"refuse for 1 %d<%d\"\n",
+				rf.me, STATE[rf.State], rf.CurrentTerm,
+				args.Term, rf.CurrentTerm)
+		}
 		return
 	}
+
 	//(除了rpc任期过期外都需要选举计时器)
 	rf.LastRPC = time.Now()
+
 	// 2a: 被检查日志条目不存在 (按全局索引比较
 	if args.PrevLogIndex > rf.LogLength-1 {
 		reply.XTerm = -1
 		reply.XLen = rf.LogLength
 		reply.Success = false
+
+		// DEBUG
+		DPrintf("[TEMP] p%d(%v,%d) \" 2a: %d>%d-1 XTerm=-1,XLen=%d\"\n",
+			rf.me, STATE[rf.State], rf.CurrentTerm,
+			args.PrevLogIndex, rf.LogLength,
+			reply.XLen)
 		return
 	}
-	// 2b: 被检查日志条目任期冲突
-	P_PrevLogIndex := rf.V2PIndex(args.PrevLogIndex)
-	// 一致性检查的日志下标是0
-	if P_PrevLogIndex == 0 { // 有可能P_PrevLogIndex=0
-		if args.PrevLogTerm != rf.LastIncludedTerm {
-			reply.XTerm = rf.LastIncludedTerm
-			// 这种情况不需要再找了
-			reply.Success = false
-			rf.Log = rf.Log[:1]
-			rf.LogLength = rf.P2VIndex(len(rf.Log))
-			rf.persist()
-			return
-		}
+
+	// 思考这里tobeCheckIndex会<0吗 这意味着leader的快照更旧
+	tobeCheckIndex := rf.V2PIndex(args.PrevLogIndex)
+	tobeCheckTerm := rf.Log[tobeCheckIndex].LogTerm
+	if tobeCheckIndex == 0 {
+		tobeCheckTerm = rf.LastIncludedTerm
+		rf.Log[0].LogTerm = rf.LastIncludedTerm //方便后面从0开始
 	}
-	// 一致性检查的日志下标不是0
-	if P_PrevLogIndex != 0 &&
-		args.PrevLogTerm != rf.Log[P_PrevLogIndex].LogTerm {
-		reply.XTerm = rf.Log[P_PrevLogIndex].LogTerm
+
+	// 2b: 被检查日志条目任期冲突
+	if args.PrevLogTerm != tobeCheckTerm {
+		reply.XTerm = tobeCheckTerm
+		reply.Success = false
 		// 找到该任期在日志第一次出现的下标
-		for i := 1; i <= P_PrevLogIndex; i++ {
-			if rf.Log[i].LogTerm == reply.XTerm {
+		for i := 0; i <= tobeCheckIndex; i++ {
+			if rf.Log[i].LogTerm == tobeCheckTerm {
 				reply.XIndex = rf.P2VIndex(i)
-				break // BUG 大发现
+				break
 			}
 		}
-		reply.Success = false
+
 		// 删除包括该冲突日志在内的后续所有日志
-		rf.Log = rf.Log[:P_PrevLogIndex]
+		if tobeCheckIndex == 0 {
+			rf.Log = rf.Log[:1]
+		} else {
+			rf.Log = rf.Log[:tobeCheckIndex]
+		}
 		rf.LogLength = rf.P2VIndex(len(rf.Log))
 		rf.persist()
+
+		// DEBUG
+		DPrintf("[TEMP] p%d(%v,%d) \" 2b: %d!=[%d+%d].%d XTerm=%d,XIndex=%d\"\n",
+			rf.me, STATE[rf.State], rf.CurrentTerm,
+			args.PrevLogTerm, tobeCheckIndex, rf.LastIncludedIndex, tobeCheckTerm,
+			reply.XTerm, reply.XIndex)
 		return
 	}
 
 	// 附加了日志(这里通过了一致性检查+任期检查)
 	if len(args.Entries) != 0 {
-		index := P_PrevLogIndex + 1
 		if DEBUG_Aped {
-			DPrintf("[APED] p%d(%v,%d) \"CMIT(%d) APLY(%d) Add Log[%d~%d] log[last]:%v\"\n",
+			DPrintf("[APED] p%d(%v,%d) \"CMIT(%d) APLY(%d) Add Log[%d:%d] log[last]:%v\"\n",
 				rf.me, STATE[rf.State], rf.CurrentTerm, rf.CommitIndex, rf.LastApplied,
-				index, index+len(args.Entries), args.Entries[len(args.Entries)-1])
+				args.PrevLogIndex, args.PrevLogIndex+len(args.Entries), args.Entries[len(args.Entries)-1])
 		}
 		// 在网络有故障时要注意这里
-		rf.Log = append(rf.Log[:index], args.Entries...)
+		rf.Log = append(rf.Log[:tobeCheckIndex+1], args.Entries...)
 		rf.LogLength = rf.P2VIndex(len(rf.Log))
 		rf.persist() // 持久化
 	}
@@ -848,11 +862,8 @@ func (rf *Raft) HeartbeatHandler(args *AppendEntriesArgs, reply *AppendEntriesRe
 	if args.LeaderCommit > rf.CommitIndex {
 		if DEBUG_Aped {
 			DPrintf("[CMIT] p%d(%v,%d) \"CMIT(%d->%d)\"\n",
-				rf.me, STATE[rf.State], rf.CurrentTerm, rf.CommitIndex, Min(args.LeaderCommit, rf.LogLength-1+rf.LastIncludedIndex))
+				rf.me, STATE[rf.State], rf.CurrentTerm, rf.CommitIndex, Min(args.LeaderCommit, rf.LogLength-1))
 		}
-
-		DPrintf("[CMIT] p%d \" cmit%d->%d \"\n", rf.me, rf.CommitIndex,
-			Min(args.LeaderCommit, rf.LogLength-1+rf.LastIncludedIndex))
 
 		rf.CommitIndex = Min(args.LeaderCommit, rf.LogLength-1)
 		rf.ApplyCond.Broadcast()
@@ -931,10 +942,11 @@ func (rf *Raft) HeartBeatGoroutine(heartTime int) {
 	for !rf.killed() {
 		rf.mu.Lock()
 
-		if cnt%3 == 0 && DEBUG_Heartbeat {
+		if cnt%3 == 0 && DEBUG_Info {
 			DPrintf("[Info] p%d(%v,%d) \"CMIT(%d) APLY(%d) SnapIndex=%d LogLen=%d log[last]=%v NextIndex:%v MatchIndex:%v\"",
 				rf.me, STATE[rf.State], rf.CurrentTerm, rf.CommitIndex,
-				rf.LastApplied, rf.LastIncludedIndex, rf.LogLength, rf.Log[rf.P2VIndex(rf.LogLength)-1], rf.NextIndex, rf.MatchIndex)
+				rf.LastApplied, rf.LastIncludedIndex, rf.LogLength,
+				rf.Log[rf.V2PIndex(rf.LogLength)-1], rf.NextIndex, rf.MatchIndex)
 		}
 
 		if rf.State == LEADER {
@@ -1017,7 +1029,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.readPersist(persister.ReadRaftState(), persister.ReadSnapshot())
 
 	// 心跳线程
-	go rf.HeartBeatGoroutine(75)
+	go rf.HeartBeatGoroutine(50)
 	// 选举线程
 	go rf.ElectionGoroutine()
 	// apply线程

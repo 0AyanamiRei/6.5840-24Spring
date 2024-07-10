@@ -1180,27 +1180,33 @@ func snapcommon(t *testing.T, name string, disconnect bool, reliable bool, crash
 	cfg.end()
 }
 
+// 3D-1
 func TestSnapshotBasic3D(t *testing.T) {
 	snapcommon(t, "Test (3D): snapshots basic", false, true, false)
 }
 
+// 3D-2
 func TestSnapshotInstall3D(t *testing.T) {
 	snapcommon(t, "Test (3D): install snapshots (disconnect)", true, true, false)
 }
 
+// 3D-3
 func TestSnapshotInstallUnreliable3D(t *testing.T) {
 	snapcommon(t, "Test (3D): install snapshots (disconnect+unreliable)",
 		true, false, false)
 }
 
+// 3D-4
 func TestSnapshotInstallCrash3D(t *testing.T) {
 	snapcommon(t, "Test (3D): install snapshots (crash)", false, true, true)
 }
 
+// 3D-5
 func TestSnapshotInstallUnCrash3D(t *testing.T) {
 	snapcommon(t, "Test (3D): install snapshots (unreliable+crash)", false, false, true)
 }
 
+// 3D-6
 // do the servers persist the snapshots, and
 // restart using snapshot along with the
 // tail of the log?
@@ -1242,6 +1248,7 @@ func TestSnapshotAllCrash3D(t *testing.T) {
 	cfg.end()
 }
 
+// 3D-7
 // do servers correctly initialize their in-memory copy of the snapshot, making
 // sure that future writes to persistent state don't lose state?
 func TestSnapshotInit3D(t *testing.T) {

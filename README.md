@@ -6,5 +6,5 @@
 - [x] Lab3B: Log
 - [x] Lab3C: Persistence
 - [x] Lab3D: Log Compaction ( Snapshot )
-- [] Lab4A: Key/value service without snapshots
-- [] Lab4B: Key/value service with snapshots
+- [ ] Lab4A: Key/value service without snapshots
+- [ ] Lab4B: Key/value service with snapshots

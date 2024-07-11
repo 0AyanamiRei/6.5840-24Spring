@@ -27,6 +27,8 @@
 
 ## Lab
 
+如果您也在进行该课程附带的实验内容, 那么我不建议您翻阅我的源码, 一来是为了锻炼自己的能力, 遵守学术诚信, 二来是我自知我的代码难以阅读, 设计上会给您带来极大的困扰
+
 - [x] Lab1: MapReduce
 - [ ] Lab1: Challenge
 - [x] Lab2: Key/Value Server
@@ -43,5 +45,11 @@
 
 完成上述`Lab`的过程中, 我检查了大量的错误日志, 也从阅读材料和其他人的设计中学到了许多, 思考过后打算对原有的实验内容进行改动, 自己去实现一遍, 在过程中锻炼自己.
 
-- [ ] 更真实的测试
-- [ ] Raft的完善
+**可能有帮助的阅读材料**
+
+1. [分布式系统中的网络模型和故障模型](https://danielw.cn/network-failure-models)
+2. [Symmetric network partitioning](https://github.com/baidu/braft/blob/master/docs/cn/raft_protocol.md#symmetric-network-partitioning)
+3. [一个极端的网络故障场景](https://www.zhihu.com/question/483967518),[CheckQuorum](https://github.com/etcd-io/etcd/issues/3866) 
+
+- [ ] 更完善的测评: 实验自带的测评并没有cover所有情况, 甚至可以说只保证了大部分情况下能用, 但是很多极端的环境下都未进行测试
+- [ ] 更完善的Raft

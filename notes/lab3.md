@@ -316,7 +316,9 @@ so, 当前的设置
 
 `python dtest.py TestSnapshotBasic3D TestSnapshotInstall3D -n 20 -v -p 10`
 
-`python dtest.py TestSnapshotBasic3D TestSnapshotInstall3D TestSnapshotInstallUnreliable3D -n 20 -v -p 10`
+`python dtest.py TestSnapshotBasic3D TestSnapshotInstall3D TestSnapshotInstallUnreliable3D TestSnapshotInstallCrash3D TestSnapshotInstallUnCrash3D -n 20 -v -p 10`
+
+**完整测试** `python dtest.py 3A 3B 3C 3D -n 20 -v -p 10`
 
 ---
 
@@ -356,4 +358,5 @@ so, 当前的设置
 ### BUG记录
 
 1. 报错的信息是`panic: runtime error: index out of range [-8]`, 出错的代码:`PrevLogTerm[i] = rf.Log[rf.V2PIndex(rf.NextIndex[i])-1].LogTerm`, 此时的`NextIndex: = [14 1 2]`, 分析结果是`p2`因为断连不跟领导人联系, 那么`NextIndex[2]`就一直保持了断开网络前的状态, 也就是2, 但此时领导人的`LastIncludedIndex`是9, 所以导致了这里索引为负值, 主要还是`NextIndex`不更新的原因, **为什么不检查出来就直接发snapshot呢?**
-2. 一旦领导人在失联的服务器重连回来并发起投票的时候, 也就是说暂时d领导人收到
+2. 崩溃后重启的服务器会从快照和持久化数据中恢复数据, 由于我们并没有持久化`CommitIndex`和`LastApplied`, 所以恢复后的服务器只有快照加保存的日志内容, 这个时候当前的领导人会追加日志到该服务器, 然后在`HeartbeatHandler()`更新自己的`CommitIndex`, 但是因为`LastApplied=0`, 明显`rf.CommitIndex > rf.LastApplied`, 所以应用日志的时候会导致`rf.V2PIndex(rf.LastApplied) < 0`, 出现负数索引, 所以要么我们持久化该信息, 要么在修改`CommitIndex`的同时保证`LastApplied`不小于`rf.LastIncludedIndex`
+3. `TestSnapshotAllCrash3D`中, 如果所有机器都挂掉, 然后重启, 那么会出现`2`中提到的问题, 因为这个时候

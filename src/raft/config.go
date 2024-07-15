@@ -128,7 +128,7 @@ func (cfg *config) crash1(i int) {
 	rf := cfg.rafts[i]
 	if rf != nil {
 		cfg.mu.Unlock()
-		rf.Kill()
+		rf.Kill() // 模拟这个服务器崩溃
 		cfg.mu.Lock()
 		cfg.rafts[i] = nil
 	}

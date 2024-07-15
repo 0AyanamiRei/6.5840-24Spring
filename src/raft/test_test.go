@@ -1140,7 +1140,7 @@ func snapcommon(t *testing.T, name string, disconnect bool, reliable bool, crash
 			cfg.one(rand.Int(), servers-1, true)
 		}
 		if crash {
-			cfg.crash1(victim)
+			cfg.crash1(victim) // 模拟服务器崩溃
 			cfg.one(rand.Int(), servers-1, true)
 		}
 
@@ -1163,6 +1163,7 @@ func snapcommon(t *testing.T, name string, disconnect bool, reliable bool, crash
 		if cfg.LogSize() >= MAXLOGSIZE {
 			cfg.t.Fatalf("Log size too large")
 		}
+
 		if disconnect {
 			// reconnect a follower, who maybe behind and
 			// needs to rceive a snapshot to catch up.
@@ -1170,8 +1171,9 @@ func snapcommon(t *testing.T, name string, disconnect bool, reliable bool, crash
 			cfg.one(rand.Int(), servers, true)
 			leader1 = cfg.checkOneLeader()
 		}
+
 		if crash {
-			cfg.start1(victim, cfg.applierSnap)
+			cfg.start1(victim, cfg.applierSnap) // 恢复该服务器, 从快照中读取状态
 			cfg.connect(victim)
 			cfg.one(rand.Int(), servers, true)
 			leader1 = cfg.checkOneLeader()

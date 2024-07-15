@@ -361,6 +361,7 @@ func (rf *Raft) InstallSnapshot(args *SnapshotArgs, reply *SnapshotRelpay) {
 		SnapshotTerm:  args.LastIncludedTerm,
 		SnapshotIndex: args.LastIncludedIndex,
 	}
+
 	rf.persist()
 
 	if DEBUG_Snap {
@@ -700,10 +701,13 @@ func (rf *Raft) SendHeartbeat(to int, args AppendEntriesArgs) {
 				// 更新rf.CommitIndex 需要在这里唤醒apply线程
 				if count > len(rf.peers)/2 {
 					if DEBUG_Aped {
-						DPrintf("[CMIT] p%d(%v,%d) CMIT(%d->%d)\n", rf.me, STATE[rf.State], rf.CurrentTerm,
-							rf.CommitIndex, N+rf.LastIncludedIndex)
+						DPrintf("[CMIT] p%d(%v,%d) \"CMIT(%d->%d) APLY(%d->%d)\"\n",
+							rf.me, STATE[rf.State], rf.CurrentTerm,
+							rf.CommitIndex, N,
+							rf.LastApplied, Max(rf.LastApplied, rf.LastIncludedIndex))
 					}
 					rf.CommitIndex = N
+					rf.LastApplied = Max(rf.LastApplied, rf.LastIncludedIndex) // 安全性
 					rf.ApplyCond.Broadcast()
 					rf.mu.Unlock()
 					return
@@ -861,11 +865,14 @@ func (rf *Raft) HeartbeatHandler(args *AppendEntriesArgs, reply *AppendEntriesRe
 	// AppendEntries RPC的第五条建议 需要唤醒apply线程
 	if args.LeaderCommit > rf.CommitIndex {
 		if DEBUG_Aped {
-			DPrintf("[CMIT] p%d(%v,%d) \"CMIT(%d->%d)\"\n",
-				rf.me, STATE[rf.State], rf.CurrentTerm, rf.CommitIndex, Min(args.LeaderCommit, rf.LogLength-1))
+			DPrintf("[CMIT] p%d(%v,%d) \"CMIT(%d->%d) APLY(%d->%d)\"\n",
+				rf.me, STATE[rf.State], rf.CurrentTerm,
+				rf.CommitIndex, Min(args.LeaderCommit, rf.LogLength-1),
+				rf.LastApplied, Max(rf.LastApplied, rf.LastIncludedIndex))
 		}
 
 		rf.CommitIndex = Min(args.LeaderCommit, rf.LogLength-1)
+		rf.LastApplied = Max(rf.LastApplied, rf.LastIncludedIndex) // 保证LastApplied不小于LastIncludedIndex
 		rf.ApplyCond.Broadcast()
 		return
 	}
@@ -902,7 +909,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 //************************************************************************************
 
 func (rf *Raft) Kill() {
-	//DPrintf("p%d was killed\n", rf.me)
+	DPrintf("p%d was killed\n", rf.me)
 	atomic.StoreInt32(&rf.dead, 1)
 	// Your code here, if desired.
 }
@@ -1027,6 +1034,12 @@ func Make(peers []*labrpc.ClientEnd, me int,
 
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState(), persister.ReadSnapshot())
+
+	// DEBUG
+	DPrintf("[MAKE] p%d(%v,%d) \"Log[0:%d:%d) CMIT:%d APLY:%d\"\n",
+		rf.me, STATE[rf.State], rf.CurrentTerm,
+		rf.LastIncludedIndex, rf.LogLength,
+		rf.CommitIndex, rf.LastApplied)
 
 	// 心跳线程
 	go rf.HeartBeatGoroutine(50)

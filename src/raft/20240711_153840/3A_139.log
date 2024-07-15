@@ -1,0 +1,382 @@
+disconnect(0)
+000005  [MAKE] p0(F,0) "Log[0:0:1) CMIT:0 APLY:0"
+disconnect(1)
+000005  [MAKE] p1(F,0) "Log[0:0:1) CMIT:0 APLY:0"
+disconnect(2)
+000005  [MAKE] p2(F,0) "Log[0:0:1) CMIT:0 APLY:0"
+connect(0)
+connect(1)
+connect(2)
+Test (3A): initial election ...
+003802  [VOTE-1] p0(F,1): Vote Start
+003802  [VOTE-1] p0(F,1)->p2 "Ask Vote"
+003802  [VOTE-1] p0(F,1)->p1 "Ask Vote"
+003802  [VOTE-1] p1(F,1)->p0 "OKKKK"
+003802  [VOTE-1] p2(F,1)->p0 "OKKKK"
+003802  [VOTE-1] p0(F,1): Got 2 votes
+003802  [VOTE-1] p0(F,1): Got 3 votes
+  ... Passed --   3.0  3   90   24072    0
+030183  p0 was killed
+030183  p1 was killed
+030183  p2 was killed
+disconnect(0)
+030188  [MAKE] p0(F,0) "Log[0:0:1) CMIT:0 APLY:0"
+disconnect(1)
+030188  [MAKE] p1(F,0) "Log[0:0:1) CMIT:0 APLY:0"
+disconnect(2)
+030188  [MAKE] p2(F,0) "Log[0:0:1) CMIT:0 APLY:0"
+connect(0)
+connect(1)
+connect(2)
+Test (3A): election after network failure ...
+033770  [VOTE-2] p1(F,2): Vote Start
+033770  [VOTE-2] p1(F,2)->p2 "Ask Vote"
+033770  [VOTE-2] p1(F,2)->p0 "Ask Vote"
+034387  [VOTE-1] p0(F,1): Vote Start
+034387  [VOTE-1] p0(F,1)->p2 "Ask Vote"
+034387  [VOTE-1] p0(F,1)->p1 "Ask Vote"
+034387  [VOTE-1] p1(F,1)->p0 "OKKKK"
+034387  [VOTE-1] p2(F,1)->p0 "OKKKK"
+034387  [VOTE-1] p0(F,1): Got 2 votes
+034387  [VOTE-1] p0(L,1): Got 3 votes
+disconnect(0)
+039632  [VOTE-2] p2(F,2): Vote Start
+039632  [VOTE-2] p2(F,2)->p1 "Ask Vote"
+039632  [VOTE-2] p2(F,2)->p0 "Ask Vote"
+039637  [VOTE-2] p1(F,2)->p2 "OKKKK"
+039637  [VOTE-2] p2(F,2): Got 2 votes
+connect(0)
+040710  [TEMP] p2(L,2) "refuse for 1 1<2"
+040710  [TEMP] p1(F,2) "refuse for 1 1<2"
+disconnect(2)
+disconnect(0)
+052305  [VOTE-3] p0(F,3): Vote Start
+052305  [VOTE-3] p0(F,3)->p2 "Ask Vote"
+052305  [VOTE-3] p0(F,3)->p1 "Ask Vote"
+054502  [VOTE-3] p1(F,3): Vote Start
+054502  [VOTE-3] p1(F,3)->p0 "Ask Vote"
+054502  [VOTE-3] p1(F,3)->p2 "Ask Vote"
+057438  [VOTE-4] p0(F,4): Vote Start
+057438  [VOTE-4] p0(F,4)->p2 "Ask Vote"
+057438  [VOTE-4] p0(F,4)->p1 "Ask Vote"
+058056  [VOTE-4] p1(F,4): Vote Start
+058056  [VOTE-4] p1(F,4)->p2 "Ask Vote"
+058056  [VOTE-4] p1(F,4)->p0 "Ask Vote"
+061627  [VOTE-5] p0(F,5): Vote Start
+061627  [VOTE-5] p0(F,5)->p2 "Ask Vote"
+061627  [VOTE-5] p0(F,5)->p1 "Ask Vote"
+062241  [VOTE-5] p1(F,5): Vote Start
+062241  [VOTE-5] p1(F,5)->p2 "Ask Vote"
+062241  [VOTE-5] p1(F,5)->p0 "Ask Vote"
+connect(0)
+066240  [VOTE-6] p0(F,6): Vote Start
+066240  [VOTE-6] p0(F,6)->p2 "Ask Vote"
+066240  [VOTE-6] p0(F,6)->p1 "Ask Vote"
+066240  [VOTE-6] p1(F,6)->p0 "OKKKK"
+066240  [VOTE-6] p0(F,6): Got 2 votes
+connect(2)
+071022  [TEMP] p1(F,6) "refuse for 1 2<6"
+071022  [TEMP] p0(L,6) "refuse for 1 2<6"
+  ... Passed --   4.6  3  182   36504    0
+076574  p0 was killed
+076574  p1 was killed
+076574  p2 was killed
+disconnect(0)
+076574  [MAKE] p0(F,0) "Log[0:0:1) CMIT:0 APLY:0"
+disconnect(1)
+076574  [MAKE] p1(F,0) "Log[0:0:1) CMIT:0 APLY:0"
+disconnect(2)
+076574  [MAKE] p2(F,0) "Log[0:0:1) CMIT:0 APLY:0"
+disconnect(3)
+076574  [MAKE] p3(F,0) "Log[0:0:1) CMIT:0 APLY:0"
+disconnect(4)
+076579  [MAKE] p4(F,0) "Log[0:0:1) CMIT:0 APLY:0"
+disconnect(5)
+076579  [MAKE] p5(F,0) "Log[0:0:1) CMIT:0 APLY:0"
+disconnect(6)
+076579  [MAKE] p6(F,0) "Log[0:0:1) CMIT:0 APLY:0"
+connect(0)
+connect(1)
+connect(2)
+connect(3)
+connect(4)
+connect(5)
+connect(6)
+Test (3A): multiple elections ...
+080188  [VOTE-1] p2(F,1): Vote Start
+080188  [VOTE-1] p2(F,1)->p6 "Ask Vote"
+080188  [VOTE-1] p2(F,1)->p3 "Ask Vote"
+080188  [VOTE-1] p2(F,1)->p0 "Ask Vote"
+080188  [VOTE-1] p2(F,1)->p4 "Ask Vote"
+080188  [VOTE-1] p6(F,1)->p2 "OKKKK"
+080188  [VOTE-1] p0(F,1)->p2 "OKKKK"
+080188  [VOTE-1] p2(F,1)->p5 "Ask Vote"
+080188  [VOTE-1] p3(F,1)->p2 "OKKKK"
+080188  [VOTE-1] p4(F,1)->p2 "OKKKK"
+080188  [VOTE-1] p2(F,1)->p1 "Ask Vote"
+080188  [VOTE-1] p2(F,1): Got 4 votes
+080193  [VOTE-1] p2(L,1): Got 5 votes
+080193  [VOTE-1] p5(F,1)->p2 "OKKKK"
+080193  [VOTE-1] p1(F,1)->p2 "OKKKK"
+080193  [VOTE-1] p2(L,1): Got 6 votes
+080193  [VOTE-1] p2(L,1): Got 7 votes
+disconnect(5)
+disconnect(3)
+disconnect(2)
+081596  [VOTE-7] p1(F,7): Vote Start
+081596  [VOTE-7] p1(F,7)->p2 "Ask Vote"
+081596  [VOTE-7] p1(F,7)->p0 "Ask Vote"
+084704  [VOTE-2] p4(F,2): Vote Start
+084710  [VOTE-2] p4(F,2)->p6 "Ask Vote"
+084710  [VOTE-2] p4(F,2)->p0 "Ask Vote"
+084710  [VOTE-2] p4(F,2)->p1 "Ask Vote"
+084710  [VOTE-2] p4(F,2)->p5 "Ask Vote"
+084710  [VOTE-2] p4(F,2)->p2 "Ask Vote"
+084710  [VOTE-2] p4(F,2)->p3 "Ask Vote"
+084710  [VOTE-2] p0(F,2)->p4 "OKKKK"
+084710  [VOTE-2] p6(F,2)->p4 "OKKKK"
+084710  [VOTE-2] p1(F,2)->p4 "OKKKK"
+084710  [VOTE-2] p4(F,2): Got 4 votes
+connect(5)
+connect(3)
+connect(2)
+disconnect(5)
+disconnect(1)
+disconnect(4)
+085937  [TEMP] p4(L,2) "refuse for 1 1<2"
+085937  [TEMP] p6(F,2) "refuse for 1 1<2"
+086399  [VOTE-2] p3(F,2): Vote Start
+086399  [VOTE-2] p3(F,2)->p6 "Ask Vote"
+086399  [VOTE-2] p3(F,2)->p2 "Ask Vote"
+086399  [VOTE-2] p3(F,2)->p4 "Ask Vote"
+086399  [VOTE-2] p3(F,2)->p0 "Ask Vote"
+086399  [VOTE-2] p3(F,2)->p5 "Ask Vote"
+086399  [VOTE-2] p3(F,2)->p1 "Ask Vote"
+086399  [VOTE-2] p6(F,2)->p3 "Refuse Vote:(4)"
+086399  [VOTE-2] p2(F,2)->p3 "Refuse Vote:(4)"
+086404  [VOTE-2] p0(F,2)->p3 "Refuse Vote:(4)"
+086709  [VOTE-2] p5(F,2): Vote Start
+086709  [VOTE-2] p5(F,2)->p6 "Ask Vote"
+086709  [VOTE-2] p5(F,2)->p1 "Ask Vote"
+086709  [VOTE-2] p5(F,2)->p3 "Ask Vote"
+086709  [VOTE-2] p5(F,2)->p4 "Ask Vote"
+086709  [VOTE-2] p5(F,2)->p0 "Ask Vote"
+086709  [VOTE-2] p5(F,2)->p2 "Ask Vote"
+090275  [VOTE-3] p3(F,3): Vote Start
+090275  [VOTE-3] p3(F,3)->p6 "Ask Vote"
+090275  [VOTE-3] p3(F,3)->p0 "Ask Vote"
+090275  [VOTE-3] p3(F,3)->p1 "Ask Vote"
+090275  [VOTE-3] p3(F,3)->p5 "Ask Vote"
+090275  [VOTE-3] p3(F,3)->p4 "Ask Vote"
+090275  [VOTE-3] p3(F,3)->p2 "Ask Vote"
+090275  [VOTE-3] p0(F,3)->p3 "OKKKK"
+090275  [VOTE-3] p6(F,3)->p3 "OKKKK"
+090280  [VOTE-3] p2(F,3)->p3 "OKKKK"
+090280  [VOTE-3] p3(F,3): Got 4 votes
+connect(5)
+connect(1)
+connect(4)
+disconnect(4)
+disconnect(4)
+disconnect(6)
+091204  [VOTE-3] p5(F,3): Vote Start
+091204  [VOTE-3] p5(F,3)->p6 "Ask Vote"
+091204  [VOTE-3] p5(F,3)->p3 "Ask Vote"
+091204  [VOTE-3] p5(F,3)->p0 "Ask Vote"
+091204  [VOTE-3] p5(F,3)->p2 "Ask Vote"
+091204  [VOTE-3] p5(F,3)->p1 "Ask Vote"
+091204  [VOTE-3] p3(L,3)->p5 "Refuse Vote:(4)"
+091204  [VOTE-3] p0(F,3)->p5 "Refuse Vote:(4)"
+091204  [VOTE-3] p2(F,3)->p5 "Refuse Vote:(4)"
+091204  [VOTE-3] p1(F,3)->p5 "OKKKK"
+091204  [VOTE-3] p5(F,3)->p4 "Ask Vote"
+095956  [VOTE-4] p6(F,4): Vote Start
+095956  [VOTE-4] p6(F,4)->p5 "Ask Vote"
+095956  [VOTE-4] p6(F,4)->p2 "Ask Vote"
+095956  [VOTE-4] p6(F,4)->p0 "Ask Vote"
+095956  [VOTE-4] p6(F,4)->p4 "Ask Vote"
+095956  [VOTE-4] p6(F,4)->p3 "Ask Vote"
+095956  [VOTE-4] p6(F,4)->p1 "Ask Vote"
+connect(4)
+connect(4)
+connect(6)
+disconnect(1)
+disconnect(3)
+disconnect(2)
+097039  [TEMP] p0(F,3) "refuse for 1 2<3"
+097039  [TEMP] p6(F,4) "refuse for 1 2<4"
+097039  [TEMP] p5(F,3) "refuse for 1 2<3"
+099959  [VOTE-5] p6(F,5): Vote Start
+099959  [VOTE-5] p6(F,5)->p5 "Ask Vote"
+099959  [VOTE-5] p6(F,5)->p2 "Ask Vote"
+099959  [VOTE-5] p6(F,5)->p0 "Ask Vote"
+099959  [VOTE-5] p6(F,5)->p1 "Ask Vote"
+099959  [VOTE-5] p0(F,5)->p6 "OKKKK"
+099959  [VOTE-5] p5(F,5)->p6 "OKKKK"
+099959  [VOTE-5] p6(F,5)->p3 "Ask Vote"
+099959  [VOTE-5] p6(F,5)->p4 "Ask Vote"
+099959  [VOTE-5] p4(F,5)->p6 "OKKKK"
+099959  [VOTE-5] p6(F,5): Got 4 votes
+connect(1)
+connect(3)
+connect(2)
+disconnect(5)
+disconnect(4)
+disconnect(5)
+102107  [VOTE-4] p1(F,4): Vote Start
+102113  [VOTE-4] p1(F,4)->p6 "Ask Vote"
+102113  [VOTE-4] p1(F,4)->p2 "Ask Vote"
+102113  [VOTE-4] p1(F,4)->p0 "Ask Vote"
+102113  [VOTE-4] p1(F,4)->p5 "Ask Vote"
+102113  [VOTE-4] p1(F,4)->p4 "Ask Vote"
+102113  [VOTE-4] p6(L,5)->p1 "Refuse Vote:(6)"
+102113  [VOTE-4] p2(F,4)->p1 "OKKKK"
+102113  [VOTE-4] p0(F,5)->p1 "Refuse Vote:(6)"
+102113  [VOTE-4] p1(F,4)->p3 "Ask Vote"
+102113  [VOTE-4] p3(F,4)->p1 "OKKKK"
+connect(5)
+connect(4)
+connect(5)
+disconnect(5)
+disconnect(6)
+disconnect(0)
+108767  [VOTE-6] p5(F,6): Vote Start
+108767  [VOTE-6] p5(F,6)->p6 "Ask Vote"
+108767  [VOTE-6] p5(F,6)->p2 "Ask Vote"
+108767  [VOTE-6] p5(F,6)->p3 "Ask Vote"
+108767  [VOTE-6] p5(F,6)->p1 "Ask Vote"
+108767  [VOTE-6] p5(F,6)->p4 "Ask Vote"
+108767  [VOTE-6] p5(F,6)->p0 "Ask Vote"
+109529  [VOTE-6] p4(F,6): Vote Start
+109529  [VOTE-6] p4(F,6)->p6 "Ask Vote"
+109529  [VOTE-6] p4(F,6)->p1 "Ask Vote"
+109529  [VOTE-6] p4(F,6)->p3 "Ask Vote"
+109529  [VOTE-6] p4(F,6)->p0 "Ask Vote"
+109529  [VOTE-6] p4(F,6)->p2 "Ask Vote"
+109529  [VOTE-6] p4(F,6)->p5 "Ask Vote"
+109529  [VOTE-6] p1(F,6)->p4 "OKKKK"
+109529  [VOTE-6] p3(F,6)->p4 "OKKKK"
+109529  [VOTE-6] p2(F,6)->p4 "OKKKK"
+109534  [VOTE-6] p4(F,6): Got 4 votes
+connect(5)
+connect(6)
+connect(0)
+disconnect(3)
+disconnect(1)
+disconnect(5)
+111851  [TEMP] p2(F,6) "refuse for 1 5<6"
+111851  [TEMP] p0(F,6) "refuse for 1 5<6"
+111851  [TEMP] p4(L,6) "refuse for 1 5<6"
+113867  [VOTE-7] p5(F,7): Vote Start
+113867  [VOTE-7] p5(F,7)->p6 "Ask Vote"
+113867  [VOTE-7] p5(F,7)->p4 "Ask Vote"
+113867  [VOTE-7] p5(F,7)->p2 "Ask Vote"
+113867  [VOTE-7] p5(F,7)->p0 "Ask Vote"
+113867  [VOTE-7] p5(F,7)->p1 "Ask Vote"
+113867  [VOTE-7] p5(F,7)->p3 "Ask Vote"
+connect(3)
+connect(1)
+connect(5)
+disconnect(0)
+disconnect(1)
+disconnect(4)
+117238  [VOTE-7] p1(F,7): Vote Start
+117238  [VOTE-7] p1(F,7)->p6 "Ask Vote"
+117238  [VOTE-7] p1(F,7)->p3 "Ask Vote"
+117238  [VOTE-7] p1(F,7)->p5 "Ask Vote"
+117238  [VOTE-7] p1(F,7)->p4 "Ask Vote"
+117238  [VOTE-7] p1(F,7)->p2 "Ask Vote"
+117238  [VOTE-7] p1(F,7)->p0 "Ask Vote"
+117857  [VOTE-8] p5(F,8): Vote Start
+117857  [VOTE-8] p5(F,8)->p6 "Ask Vote"
+117857  [VOTE-8] p5(F,8)->p2 "Ask Vote"
+117857  [VOTE-8] p5(F,8)->p4 "Ask Vote"
+117857  [VOTE-8] p5(F,8)->p1 "Ask Vote"
+117857  [VOTE-8] p5(F,8)->p3 "Ask Vote"
+117857  [VOTE-8] p5(F,8)->p0 "Ask Vote"
+117857  [VOTE-8] p6(F,8)->p5 "OKKKK"
+117857  [VOTE-8] p2(F,8)->p5 "OKKKK"
+117857  [VOTE-8] p3(F,8)->p5 "OKKKK"
+117857  [VOTE-8] p5(F,8): Got 4 votes
+121747  [VOTE-7] p0(F,7): Vote Start
+121747  [VOTE-7] p0(F,7)->p6 "Ask Vote"
+121747  [VOTE-7] p0(F,7)->p1 "Ask Vote"
+121747  [VOTE-7] p0(F,7)->p3 "Ask Vote"
+121747  [VOTE-7] p0(F,7)->p4 "Ask Vote"
+121747  [VOTE-7] p0(F,7)->p5 "Ask Vote"
+121747  [VOTE-7] p0(F,7)->p2 "Ask Vote"
+122223  [VOTE-8] p1(F,8): Vote Start
+122223  [VOTE-8] p1(F,8)->p6 "Ask Vote"
+122223  [VOTE-8] p1(F,8)->p3 "Ask Vote"
+122223  [VOTE-8] p1(F,8)->p4 "Ask Vote"
+122223  [VOTE-8] p1(F,8)->p2 "Ask Vote"
+122223  [VOTE-8] p1(F,8)->p0 "Ask Vote"
+122223  [VOTE-8] p1(F,8)->p5 "Ask Vote"
+connect(0)
+connect(1)
+connect(4)
+disconnect(0)
+disconnect(1)
+disconnect(3)
+122386  [TEMP] p5(L,8) "refuse for 1 6<8"
+126402  [VOTE-8] p0(F,8): Vote Start
+126402  [VOTE-8] p0(F,8)->p6 "Ask Vote"
+126402  [VOTE-8] p0(F,8)->p2 "Ask Vote"
+126402  [VOTE-8] p0(F,8)->p3 "Ask Vote"
+126402  [VOTE-8] p0(F,8)->p1 "Ask Vote"
+126402  [VOTE-8] p0(F,8)->p4 "Ask Vote"
+126402  [VOTE-8] p0(F,8)->p5 "Ask Vote"
+127173  [VOTE-9] p3(F,9): Vote Start
+127173  [VOTE-9] p3(F,9)->p6 "Ask Vote"
+127173  [VOTE-9] p3(F,9)->p0 "Ask Vote"
+127173  [VOTE-9] p3(F,9)->p4 "Ask Vote"
+127173  [VOTE-9] p3(F,9)->p1 "Ask Vote"
+127173  [VOTE-9] p3(F,9)->p5 "Ask Vote"
+127173  [VOTE-9] p3(F,9)->p2 "Ask Vote"
+connect(0)
+connect(1)
+connect(3)
+127954  [TEMP] p3(F,9) "refuse for 1 8<9"
+132272  [VOTE-9] p6(F,9): Vote Start
+132272  [VOTE-10] p3(F,10): Vote Start
+132272  [VOTE-9] p6(F,9)->p2 "Ask Vote"
+132272  [VOTE-9] p6(F,9)->p4 "Ask Vote"
+132272  [VOTE-9] p6(F,9)->p1 "Ask Vote"
+132272  [VOTE-10] p3(F,10)->p4 "Ask Vote"
+132272  [VOTE-9] p2(F,9)->p6 "OKKKK"
+132272  [VOTE-9] p6(F,9)->p0 "Ask Vote"
+132272  [VOTE-9] p1(F,9)->p6 "OKKKK"
+132272  [VOTE-10] p3(F,10)->p6 "Ask Vote"
+132272  [VOTE-9] p6(F,9)->p5 "Ask Vote"
+132272  [VOTE-9] p6(F,9)->p3 "Ask Vote"
+132272  [VOTE-9] p0(F,9)->p6 "OKKKK"
+132272  [VOTE-9] p5(F,9)->p6 "Refuse Vote:(4)"
+132272  [VOTE-9] p6(F,9): Got 4 votes
+132272  [VOTE-9] p3(F,10)->p6 "Refuse Vote:(6)"
+132272  [VOTE-10] p3(F,10)->p0 "Ask Vote"
+132272  [VOTE-10] p3(F,10)->p1 "Ask Vote"
+132272  [VOTE-10] p3(F,10)->p2 "Ask Vote"
+132272  [VOTE-10] p3(F,10)->p5 "Ask Vote"
+132272  [VOTE-10] p0(F,10)->p3 "OKKKK"
+132272  [VOTE-10] p1(F,10)->p3 "OKKKK"
+132272  [VOTE-10] p2(F,10)->p3 "OKKKK"
+132272  [VOTE-10] p6(F,10)->p3 "OKKKK"
+132272  [VOTE-9] p4(F,9)->p6 "OKKKK"
+132272  [VOTE-10] p3(F,10): Got 4 votes
+132272  [VOTE-10] p5(F,10)->p3 "OKKKK"
+132272  [VOTE-10] p3(L,10): Got 5 votes
+132272  [VOTE-10] p4(F,10)->p3 "OKKKK"
+132272  [VOTE-10] p3(L,10): Got 6 votes
+132272  [VOTE-10] p3(L,10): Got 7 votes
+132743  p0 was killed
+132743  p1 was killed
+132743  p2 was killed
+132743  p3 was killed
+132743  p4 was killed
+132743  p5 was killed
+132743  p6 was killed
+--- FAIL: TestManyElections3A (5.62s)
+    config.go:447: term 10 has 2 (>1) leaders
+FAIL
+exit status 1
+FAIL	6.5840/raft	13.475s

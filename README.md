@@ -30,13 +30,13 @@
 
 如果您也在进行该课程附带的实验内容, 那么我不建议您翻阅我的源码, 一来是为了锻炼自己的能力, 遵守学术诚信, 二来是我自知我的代码难以阅读, 设计上会给您带来极大的困扰
 
-- [x] Lab1: MapReduce
-- [ ] Lab1: Challenge
-- [x] Lab2: Key/Value Server
-- [x] Lab3A: Leader election
-- [x] Lab3B: Log
-- [x] Lab3C: Persistence
-- [x] Lab3D: Log Compaction ( Snapshot )
+- [x] Lab1: MapReduce [实验日志](./labNotes/lab1.md)
+- [ ] Lab1: Challenge 
+- [x] Lab2: Key/Value Server [实验日志](./labNotes/lab2.md)
+- [x] Lab3A: (raft)Leader election
+- [x] Lab3B: (raft)Log
+- [x] Lab3C: (raft)Persistence
+- [x] Lab3D: (raft)Log Compaction ( Snapshot )
 - [ ] Lab4A: Key/value service without snapshots
 - [ ] Lab4B: Key/value service with snapshots
 - [ ] Lab5A: The Controller 和 Static Sharding

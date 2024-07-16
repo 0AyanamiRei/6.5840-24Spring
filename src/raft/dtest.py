@@ -122,11 +122,12 @@ def last_line(file: str) -> str:
 
 
 # fmt: off
+# 直接运行python dtest.py的默认选项
 def run_tests(
-    tests: List[str],
+    tests: List[str] = {"3A", "3B", "3C", "3D"},
     sequential: bool       = typer.Option(False,  '--sequential',      '-s',    help='Run all test of each group in order'),
-    workers: int           = typer.Option(1,      '--workers',         '-p',    help='Number of parallel tasks'),
-    iterations: int        = typer.Option(10,     '--iter',            '-n',    help='Number of iterations to run'),
+    workers: int           = typer.Option(8,      '--workers',         '-p',    help='Number of parallel tasks'),
+    iterations: int        = typer.Option(1,     '--iter',            '-n',    help='Number of iterations to run'),
     output: Optional[Path] = typer.Option(None,   '--output',          '-o',    help='Output path to use'),
     verbose: int           = typer.Option(0,      '--verbose',         '-v',    help='Verbosity level', count=True),
     archive: bool          = typer.Option(False,  '--archive',         '-a',    help='Save all logs intead of only failed ones'),

@@ -33,10 +33,10 @@
 - [x] Lab1: MapReduce [实验日志](./labNotes/lab1.md)
 - [ ] Lab1: Challenge 
 - [x] Lab2: Key/Value Server [实验日志](./labNotes/lab2.md)
-- [x] Lab3A: (raft)Leader election
-- [x] Lab3B: (raft)Log
-- [x] Lab3C: (raft)Persistence
-- [x] Lab3D: (raft)Log Compaction ( Snapshot )
+- [x] Lab3A: (raft)Leader election [实验日志](./labNotes/lab3a.md)
+- [x] Lab3B: (raft)Log [实验日志](./labNotes/lab3b.md)
+- [x] Lab3C: (raft)Persistence [实验日志](./labNotes/lab3c.md)
+- [x] Lab3D: (raft)Log Compaction ( Snapshot ) [实验日志](./labNotes/lab3d.md)
 - [ ] Lab4A: Key/value service without snapshots
 - [ ] Lab4B: Key/value service with snapshots
 - [ ] Lab5A: The Controller 和 Static Sharding

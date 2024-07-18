@@ -46,11 +46,14 @@
 
 完成上述`Lab`的过程中, 我检查了大量的错误日志, 也从阅读材料和其他人的设计中学到了许多, 思考过后打算对原有的实验内容进行改动, 自己去实现一遍, 在过程中锻炼自己.
 
+[my raft](https://github.com/0AyanamiRei/6.5840-24Spring/blob/main/labNotes/my%20Raft.md)
+
 **可能有帮助的阅读材料**
 
 1. [分布式系统中的网络模型和故障模型](https://danielw.cn/network-failure-models)
 2. [Symmetric network partitioning](https://github.com/baidu/braft/blob/master/docs/cn/raft_protocol.md#symmetric-network-partitioning)
-3. [一个极端的网络故障场景](https://www.zhihu.com/question/483967518),[CheckQuorum](https://github.com/etcd-io/etcd/issues/3866) 
+3. [一个极端的网络故障场景](https://www.zhihu.com/question/483967518),[CheckQuorum](https://github.com/etcd-io/etcd/issues/3866)
+4. 开源的一些实现, 或许能从中学到更多测试, 以及优化实现方案: [braft(C++)](https://github.com/baidu/braft) [jraft(Java)](https://github.com/sofastack/sofa-jraft/tree/master)
 
 - [ ] 更完善的测评: 实验自带的测评并没有cover所有情况, 甚至可以说只保证了大部分情况下能用, 但是很多极端的环境下都未进行测试
 - [ ] 更完善的Raft

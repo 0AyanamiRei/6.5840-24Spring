@@ -41,34 +41,35 @@ var STATE = []string{"F", "L", "C"}
 
 // A Go object implementing a single Raft peer.
 type Raft struct {
-	mu        sync.Mutex          // Lock to protect shared access to this peer's state
-	peers     []*labrpc.ClientEnd // RPC end points of all peers
-	persister *Persister          // Object to hold this peer's persisted state
-	me        int                 // this peer's index into peers[]
-	dead      int32               // set by Kill()
+	//Raft's metadata
+	CurrentTerm int                 // 任期
+	CommitIndex int                 // (全局)已提交的日志(大多数服务器写入Log后就算作已提交)
+	LastApplied int                 // (全局)已执行的日志(已提交的日志分为已执行和未执行)
+	peers       []*labrpc.ClientEnd // RPC end points of all peers
+	me          int                 // this peer's index into peers[]
+	mu          sync.Mutex          // Lock to protect shared access to this peer's state
 
-	// 按照论文图2所示定义以下状态
-	Log         []Log // 日志
-	CurrentTerm int   // 任期
-	VotedFor    int   // 已投candidate的ID 真的需要吗?
-	CommitIndex int   // (全局)已提交的日志(大多数服务器写入Log后就算作已提交)
-	LastApplied int   // (全局)已执行的日志(已提交的日志分为已执行和未执行)
-	NextIndex   []int // (虚拟)发送到该服务器的下一个日志条目的索引
-	MatchIndex  []int // (虚拟)已知的已经复制到该服务器的最高日志条目的索引
+	//Leader Election
+	VotedFor int       // 已投candidate的ID
+	State    int       // 确认是否为领导人
+	LastRPC  time.Time // 接收心跳消息的时间
 
-	// 自定义状态
-	LastRPC   time.Time // 接收心跳消息的时间
-	State     int       // 确认是否为领导人
-	LogLength int       // (虚拟)用变量维护日志长度
+	//Log replication
+	Log        []Log // 日志
+	NextIndex  []int // (虚拟)发送到该服务器的下一个日志条目的索引
+	MatchIndex []int // (虚拟)已知的已经复制到该服务器的最高日志条目的索引
+	LogLength  int   // (虚拟)用变量维护日志长度
 
-	// 提供给应用的接口
+	// Interface
 	ApplyCh   chan ApplyMsg
 	ApplyCond *sync.Cond
+	dead      int32 // set by Kill()
 
-	// 快照
+	// Persister
 	SnapshotData      []byte
 	LastIncludedIndex int
 	LastIncludedTerm  int
+	persister         *Persister // Object to hold this peer's persisted state
 }
 
 type ApplyMsg struct {
@@ -89,9 +90,8 @@ type Log struct {
 }
 
 type RequestVoteArgs struct {
-	Term        int
-	CandidateId int
-	// 简单的一致性检查
+	Term         int
+	CandidateId  int
 	LastLogIndex int
 	LastLogTerm  int
 }
@@ -440,7 +440,7 @@ func (rf *Raft) SendRequestVote(to int, args RequestVoteArgs, vote *uint32) {
 
 	// 2:
 	if reply.VoteGranted {
-		if v := atomic.AddUint32(vote, 1); v > (uint32(len(rf.peers) / 2)) {
+		if v := atomic.AddUint32(vote, 1); v > (uint32(len(rf.peers)/2)) && rf.VotedFor == rf.me {
 			if DEBUG_Vote {
 				DPrintf("[VOTE-%d] p%d(%v,%d): Got %d votes\n",
 					args.Term, rf.me, STATE[rf.State], rf.CurrentTerm, *vote)
@@ -532,6 +532,10 @@ func (rf *Raft) RequestVoteHandler(args *RequestVoteArgs, reply *RequestVoteRepl
 
 	//4: 投票成功
 	if reply.VoteGranted {
+		if rf.VotedFor == args.CandidateId {
+			DPrintf("p%d in term %d votes twice to p%d!\n",
+				rf.me, rf.CurrentTerm, args.CandidateId)
+		}
 		rf.CurrentTerm = args.Term
 		rf.VotedFor = args.CandidateId
 		// 投票成功后重置定时器
@@ -860,6 +864,8 @@ func (rf *Raft) HeartbeatHandler(args *AppendEntriesArgs, reply *AppendEntriesRe
 //
 // 1: append to Leader's Log
 // 2: Leader send this log entries
+//
+// 接口函数, 调用前后不持有rf.mu 返回值(该命令在日志中的下标, 当前任期, 是否leader)
 func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()

@@ -1,0 +1,5 @@
+Test (3C): Figure 8 (unreliable) ...
+345293  p0 in term 62 votes twice to p2!
+  ... Passed -- time:37.1s  peers:5  nrpc:5404  nbytes:10185077  ncmds: 622
+PASS
+ok  	6.5840/raft	37.399s

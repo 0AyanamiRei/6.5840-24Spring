@@ -123,8 +123,9 @@ def last_line(file: str) -> str:
 
 # fmt: off
 # 直接运行python dtest.py的默认选项
+# TestUnreliableAgree3C TestFigure8Unreliable3C
 def run_tests(
-    tests: List[str] = {"3A", "3B", "3C", "3D"},
+    tests: List[str] = {"TestUnreliableAgree3C", "TestFigure8Unreliable3C"},
     sequential: bool       = typer.Option(False,  '--sequential',      '-s',    help='Run all test of each group in order'),
     workers: int           = typer.Option(8,      '--workers',         '-p',    help='Number of parallel tasks'),
     iterations: int        = typer.Option(1,     '--iter',            '-n',    help='Number of iterations to run'),

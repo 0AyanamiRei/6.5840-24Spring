@@ -27,6 +27,7 @@ import (
 	"time"
 )
 
+// 生成一个长度为n的随机字符串
 func randstring(n int) string {
 	b := make([]byte, 2*n)
 	crand.Read(b)
@@ -34,6 +35,7 @@ func randstring(n int) string {
 	return s[0:n]
 }
 
+// 随机生成一个0~2^62之间的数
 func makeSeed() int64 {
 	max := big.NewInt(int64(1) << 62)
 	bigx, _ := crand.Int(crand.Reader, max)
@@ -42,25 +44,26 @@ func makeSeed() int64 {
 }
 
 type config struct {
-	mu          sync.Mutex
-	t           *testing.T
-	finished    int32
-	net         *labrpc.Network
-	n           int
-	rafts       []*Raft
-	applyErr    []string // from apply channel readers
-	connected   []bool   // whether each server is on the net
-	saved       []*Persister
+	mu          sync.Mutex            //
+	t           *testing.T            //?
+	finished    int32                 //
+	net         *labrpc.Network       //
+	n           int                   // 集群服务器数量
+	rafts       []*Raft               // 服务器配置项
+	applyErr    []string              // from apply channel readers
+	connected   []bool                // whether each server is on the net
+	saved       []*Persister          // 模拟的持久化数据
 	endnames    [][]string            // the port file names each sends to
 	logs        []map[int]interface{} // copy of each server's committed entries
-	lastApplied []int
-	start       time.Time // time at which make_config() was called
+	lastApplied []int                 //
+	start       time.Time             // time at which make_config() was called
+
 	// begin()/end() statistics
 	t0        time.Time // time at which test_test.go called cfg.begin()
-	rpcs0     int       // rpcTotal() at start of test
-	cmds0     int       // number of agreements
-	bytes0    int64
-	maxIndex  int
+	rpcs0     int       // rpcTotal() at start of test 追踪集群调用的rpc数量
+	cmds0     int       // number of agreements (貌似该参数未使用)
+	bytes0    int64     // RPC bytes ( cfg.bytesTotal() )
+	maxIndex  int       // maxIndex和maxIndex0的差值反映了某段时间集群处理的请求数量
 	maxIndex0 int
 }
 
@@ -164,13 +167,13 @@ func (cfg *config) checkLogs(i int, m ApplyMsg) (string, bool) {
 // contents
 func (cfg *config) applier(i int, applyCh chan ApplyMsg) {
 	for m := range applyCh {
-		if m.CommandValid == false {
+		if !m.CommandValid {
 			// ignore other types of ApplyMsg
 		} else {
 			cfg.mu.Lock()
 			err_msg, prevok := cfg.checkLogs(i, m)
 			cfg.mu.Unlock()
-			if m.CommandIndex > 1 && prevok == false {
+			if m.CommandIndex > 1 && !prevok {
 				err_msg = fmt.Sprintf("server %v apply out of order %v", i, m.CommandIndex)
 			}
 			if err_msg != "" {
@@ -340,11 +343,15 @@ func (cfg *config) checkTimeout() {
 	}
 }
 
+// 原子读取, 返回cfg.finished != 0
 func (cfg *config) checkFinished() bool {
 	z := atomic.LoadInt32(&cfg.finished)
 	return z != 0
 }
 
+// 原子写入, 设置cfg.finished为1
+// 调用集群中每个服务器的Kill()函数
+// 关闭网络
 func (cfg *config) cleanup() {
 	atomic.StoreInt32(&cfg.finished, 1)
 	for i := 0; i < len(cfg.rafts); i++ {
@@ -358,7 +365,7 @@ func (cfg *config) cleanup() {
 
 // attach server i to the net.
 func (cfg *config) connect(i int) {
-	fmt.Printf("connect(%d)\n", i)
+	//fmt.Printf("connect(%d)\n", i)
 
 	cfg.connected[i] = true
 
@@ -381,7 +388,7 @@ func (cfg *config) connect(i int) {
 
 // detach server i from the net.
 func (cfg *config) disconnect(i int) {
-	fmt.Printf("disconnect(%d)\n", i)
+	//fmt.Printf("disconnect(%d)\n", i)
 
 	cfg.connected[i] = false
 
@@ -488,7 +495,7 @@ func (cfg *config) checkNoLeader() {
 	}
 }
 
-// how many servers think a log entry is committed?
+// 统计集群中第index条请求有多少服务器应用到了上层状态机
 func (cfg *config) nCommitted(index int) (int, interface{}) {
 	count := 0
 	var cmd interface{} = nil
@@ -544,30 +551,27 @@ func (cfg *config) wait(index int, n int, startTerm int) interface{} {
 	return cmd
 }
 
-// do a complete agreement.
-// it might choose the wrong leader initially,
-// and have to re-submit after giving up.
-// entirely gives up after about 10 seconds.
-// indirectly checks that the servers agree on the
-// same value, since nCommitted() checks this,
-// as do the threads that read from applyCh.
-// returns index.
-// if retry==true, may submit the command multiple
-// times, in case a leader fails just after Start().
-// if retry==false, calls Start() only once, in order
-// to simplify the early Lab 3B tests.
+// 向集群发出请求, 返回该请求在日志中的下标
+//
+// cmd: 要执行的命令
+// expectedServers: 期望提交该命令的服务器数量
+// retry: 是否需要重试
 func (cfg *config) one(cmd interface{}, expectedServers int, retry bool) int {
-	t0 := time.Now()
+	t0 := time.Now() // 记录当前时间
 	starts := 0
+
+	// 总超时期限设置为10s
+	// 若集群第一时间未完成该请求, 间隔50ms再向集群请求一次
 	for time.Since(t0).Seconds() < 10 && !cfg.checkFinished() {
-		// try all the servers, maybe one is the leader.
+		// 遍历cfg.rafts[], 直到找到一个leader
+		// index为cfg.rafts[starts].Start(cmd)返回的日志下标
 		index := -1
 		for si := 0; si < cfg.n; si++ {
 			starts = (starts + 1) % cfg.n
 			var rf *Raft
 			cfg.mu.Lock()
 			if cfg.connected[starts] {
-				rf = cfg.rafts[starts]
+				rf = cfg.rafts[starts] // rf是第starts个服务器的句柄
 			}
 			cfg.mu.Unlock()
 			if rf != nil {
@@ -579,8 +583,9 @@ func (cfg *config) one(cmd interface{}, expectedServers int, retry bool) int {
 			}
 		}
 
+		// 找到了leader, 检查集群是否有足够多的服务器提交该日志
+		// 等到集群提交该日志的时限为2s, 每隔20ms检查一次
 		if index != -1 {
-			// somebody claimed to be the leader and to have
 			// submitted our command; wait a while for agreement.
 			t1 := time.Now()
 			for time.Since(t1).Seconds() < 2 {
@@ -588,12 +593,12 @@ func (cfg *config) one(cmd interface{}, expectedServers int, retry bool) int {
 				if nd > 0 && nd >= expectedServers {
 					// committed
 					if cmd1 == cmd {
-						// and it was the command we submitted.
 						return index
 					}
 				}
 				time.Sleep(20 * time.Millisecond)
 			}
+
 			if !retry {
 				cfg.t.Fatalf("one(%v) failed to reach agreement", cmd)
 			}
@@ -601,9 +606,11 @@ func (cfg *config) one(cmd interface{}, expectedServers int, retry bool) int {
 			time.Sleep(50 * time.Millisecond)
 		}
 	}
+
 	if !cfg.checkFinished() {
 		cfg.t.Fatalf("one(%v) failed to reach agreement", cmd)
 	}
+
 	return -1
 }
 
@@ -635,7 +642,7 @@ func (cfg *config) end() {
 		cfg.mu.Unlock()
 
 		fmt.Printf("  ... Passed --")
-		fmt.Printf("  %4.1f  %d %4d %7d %4d\n", t, npeers, nrpc, nbytes, ncmds)
+		fmt.Printf(" time:%4.1fs  peers:%d  nrpc:%4d  nbytes:%7d  ncmds:%4d\n", t, npeers, nrpc, nbytes, ncmds)
 	}
 }
 
